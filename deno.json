@@ -1,6 +1,6 @@
 {
   "name": "@acr/hub",
-  "version": "0.1.0",
+  "version": "0.1.4",
   "license": "MIT",
   "exports": "./mod.ts",
   "fmt": {
@@ -19,7 +19,7 @@
   "tasks": {
     "check": "deno check **/*.ts && deno lint && deno fmt --check",
     "lint": "deno lint src test",
-    "release": "VERSION=$(jq -r '.version' deno.json) && echo gh release create $VERSION --title \"$VERSION\" --notes \"$(notes)\"",
+    "release": "release",
     "test": "deno test -A"
   }
 }
