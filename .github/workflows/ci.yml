@@ -42,4 +42,4 @@ jobs:
     steps:
       - { name: "🔽 Checkout code", uses: "actions/checkout@v4" }
       - { name: "⚙️ Setup Deno", uses: "denoland/setup-deno@v2" }
-      - { name: "📦 Publish to JSR", uses: "deno publish" }
+      - { name: "📦 Publish to JSR", run: "deno publish" }
