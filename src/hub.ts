@@ -137,7 +137,7 @@ export function hub(ns: boolean | string, level?: typeof LEVELS[number], options
 
   // Add special version of `debug/info/warn/error`
   // deno-lint-ignore no-explicit-any
-  LEVELS.slice(0, 4).forEach((l, i) => (instance as any)[l] = (...args: unknown[]) => n <= i  && onOff ? (c as any)[l](...parameters(args, ns, i, options)) : () => {});
+  LEVELS.slice(0, 4).forEach((l, i) => (instance as any)[l] = (...args: unknown[]) => n <= i && onOff ? (c as any)[l](...parameters(args, ns, i, options)) : () => {});
 
   // Replace the console.log in a different way that does not depend on levels
   if (options.logAlso) instance.log = (...args: unknown[]) => c.log(...parameters(args, ns, 5, options));

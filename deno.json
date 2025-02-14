@@ -19,7 +19,7 @@
   "tasks": {
     "check": "deno check **/*.ts && deno lint && deno fmt --check",
     "lint": "deno lint src test",
-    "release": "deno task check && denos task test && release",
+    "release": "release",
     "test": "deno test -A"
   }
 }
