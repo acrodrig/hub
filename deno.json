@@ -19,7 +19,7 @@
   "tasks": {
     "check": "deno check **/*.ts && deno lint && deno fmt --check",
     "lint": "deno lint src test",
-    "release": "release",
+    "release": "VERSION=$(jq -r '.version' deno.json) && echo gh release create $VERSION --title \"$VERSION\" --notes \"$(notes)\"",
     "test": "deno test -A"
   }
 }
