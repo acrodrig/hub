@@ -38,7 +38,7 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
-    permissions: { id-token: write }
+    permissions: { contents: contents: read, id-token: write }
     steps:
       - { name: "🔽 Checkout code", uses: "actions/checkout@v4" }
       - { name: "⚙️ Setup Deno", uses: "denoland/setup-deno@v2" }
