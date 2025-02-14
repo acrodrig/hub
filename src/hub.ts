@@ -1,4 +1,5 @@
 import * as colors from "@std/fmt/colors";
+import util from "node:util";
 
 /**
  * Hub - a spiritual successor to [debug-js](https://github.com/debug-js/debug)
@@ -31,6 +32,7 @@ export const COLORS = [colors.red, colors.yellow, colors.blue, colors.magenta, c
 // Defaults
 export const DEFAULTS = {
   buffer: undefined as unknown[][] | undefined,
+  compact: true,
   console: globalThis.console,
   fileLine: false,
   icons: true,
@@ -65,6 +67,10 @@ function parameters(args: unknown[], ns: string, level: number, options: { fileL
 
   // Should we add icons?
   if (options.icons) prefix = ICONS[level] + " " + prefix;
+
+  // If compact is true apply util.instpect to all arguments being objects
+  const terminal = Deno.stdout.isTerminal();
+  if (DEFAULTS.compact) args = args.map((a) => typeof a === "object" ? util.inspect(a, { breakLength: Infinity, colors: terminal, compact: true, maxArrayLength: 25 }) : a);
 
   // Organize parameters
   args = typeof args.at(0) === "string" ? [prefix + " " + args.shift(), ...args] : [prefix, ...args];
@@ -133,7 +139,7 @@ export function hub(ns: string, level?: typeof LEVELS[number], logAlso = false):
 }
 
 // Setup
-// setup();
+setup();
 
 // Export private functions so that we can test
 export { color };
