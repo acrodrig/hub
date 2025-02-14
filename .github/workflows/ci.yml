@@ -3,12 +3,15 @@
 on: [push,pull_request]
 
 # Set DENO_DIR to an absolute or relative path on the runner.
+# gh secret set DENO_AUTH_TOKENS --body "$DENO_AUTH_TOKENS"
+# gh secret set CODECOV_TOKEN --body "$CODECOV_TOKEN"
+# gh secret set GOOGLE_CREDENTIALS < manager.json
 env:
-  DENO_DIR: cache
+  DENO_AUTH_TOKENS: ${{ secrets.DENO_AUTH_TOKENS }}
+  DENO_DIR: .cache
 
 jobs:
   build:
-    name: Continuous Integration
     runs-on: ubuntu-latest
     steps:
       # Check out the code and setup deno with latest stable version
@@ -22,8 +25,9 @@ jobs:
       # Upload to Codecov (see https://github.com/marketplace/actions/codecov)
       - uses: codecov/codecov-action@v5
         with:
+          token: ${{ secrets.CODECOV_TOKEN }}
           files: cov.lcov
-          flags: unittests
+          slug: acrodrig/hub
           fail_ci_if_error: true
 
       # Check that code is correctly formatted
