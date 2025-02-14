@@ -57,7 +57,7 @@ function color(ns: string, apply = false, bold = true): string | number {
 // Utility function to prefix the output (with namespace, fileLine, etc). We need to do this
 // because we want to be 100% compatible with the console object
 
-function parameters(args: unknown[], ns: string, level: number, options: { fileLine?: boolean; icons?: boolean; time?: boolean }): unknown[] {
+function parameters(args: unknown[], ns: string, level: number, options: { fileLine?: boolean; icons?: boolean; time?: boolean; icon?: string }): unknown[] {
   // Add colors to the namespace (Deno takes care of removing if no TTY?)
   let prefix = color(ns, true, true) as string;
 
@@ -66,11 +66,11 @@ function parameters(args: unknown[], ns: string, level: number, options: { fileL
   if (options.fileLine) prefix = colors.underline(colors.white("[" + f + ":" + l + "]")) + " " + prefix;
 
   // Should we add icons?
-  if (options.icons) prefix = ICONS[level] + " " + prefix;
+  if (options.icons) prefix = (options.icon ?? ICONS[level]) + " " + prefix;
 
   // If compact is true apply util.instpect to all arguments being objects
-  const terminal = Deno.stdout.isTerminal();
-  if (DEFAULTS.compact) args = args.map((a) => typeof a === "object" ? util.inspect(a, { breakLength: Infinity, colors: terminal, compact: true, maxArrayLength: 25 }) : a);
+  const noColor = Deno.env.get("NO_COLOR") !== undefined;
+  if (DEFAULTS.compact) args = args.map((a) => typeof a === "object" ? util.inspect(a, { breakLength: Infinity, colors: !noColor, compact: true, maxArrayLength: 25 }) : a);
 
   // Organize parameters
   args = typeof args.at(0) === "string" ? [prefix + " " + args.shift(), ...args] : [prefix, ...args];
@@ -101,10 +101,10 @@ export function setup(debug: string = Deno.env.get("DEBUG") ?? ""): void {
  * Creates a dash object (which you can think of as a soup-up console)
  * @param ns - Namespace, which is the name of the logger
  * @param level - Level of logging
- * @param logAlso - whether it should extend to console.log as well
+ * @param options - options for creation of logger
  * @returns - extended console
  */
-export function hub(ns: string, level?: typeof LEVELS[number], logAlso = false): Console & { level: string } {
+export function hub(ns: string, level?: typeof LEVELS[number], options: { logAlso?: boolean; icon?: string } = {}): Console & { level: string } {
   // Has it been created before? Only use cache if we are not changing options
   let instance = cache.get(ns);
   if (instance && level) instance.level = level;
@@ -127,11 +127,12 @@ export function hub(ns: string, level?: typeof LEVELS[number], logAlso = false):
   const c = DEFAULTS.console;
 
   // Add special version of `debug/info/warn/error`
+  Object.assign(options, DEFAULTS);
   // deno-lint-ignore no-explicit-any
-  LEVELS.slice(0, 4).forEach((l, i) => (instance as any)[l] = (...args: unknown[]) => n <= i ? (c as any)[l](...parameters(args, ns, i, DEFAULTS)) : () => {});
+  LEVELS.slice(0, 4).forEach((l, i) => (instance as any)[l] = (...args: unknown[]) => n <= i ? (c as any)[l](...parameters(args, ns, i, options)) : () => {});
 
   // Replace the console.log in a different way that does not depend on levels
-  if (logAlso) instance.log = (...args: unknown[]) => c.log(...parameters(args, ns, 5, DEFAULTS));
+  if (options.logAlso) instance.log = (...args: unknown[]) => c.log(...parameters(args, ns, 5, options));
 
   // Return completed prototype. It will NOT overwrite the previously defined functions
   // NOTE: By deleting the custom object versions we can go back to the prototype versions
