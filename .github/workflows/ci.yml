@@ -1,0 +1,30 @@
+# See https://deno.land/manual/advanced/continuous_integration
+
+on: [push,pull_request]
+
+# Set DENO_DIR to an absolute or relative path on the runner.
+env:
+  DENO_DIR: cache
+
+jobs:
+  build:
+    name: Continuous Integration
+    runs-on: ubuntu-latest
+    steps:
+      # Check out the code and setup deno with latest stable version
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+
+      # Run tests, collect code coverage and generate report from the collected coverage
+      - run: deno test --allow-all --coverage=cov/
+      - run: deno coverage --lcov cov/ > cov.lcov
+
+      # Upload to Codecov (see https://github.com/marketplace/actions/codecov)
+      - uses: codecov/codecov-action@v5
+        with:
+          files: cov.lcov
+          flags: unittests
+          fail_ci_if_error: true
+
+      # Check that code is correctly formatted
+      - run: deno fmt --check
