@@ -1,1 +1,1 @@
-export { DEFAULTS, hub, setup } from "./src/hub.ts";
+export { CONSOLE, DEFAULTS, hub, setup } from "./src/hub.ts";

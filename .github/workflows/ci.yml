@@ -1,6 +1,9 @@
 # See https://deno.land/manual/advanced/continuous_integration
 
-on: [push,pull_request]
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
 
 # Set DENO_DIR to an absolute or relative path on the runner.
 # gh secret set DENO_AUTH_TOKENS --body "$DENO_AUTH_TOKENS"
@@ -11,6 +14,14 @@ env:
   DENO_DIR: .cache
 
 jobs:
+  debug:
+    runs-on: ubuntu-latest
+    steps:
+      # Print GitHub Reference Info
+      - run: |
+          echo "Full ref: ${{ github.ref }}"
+          echo "Ref name: ${{ github.ref_name }}"
+
   build:
     runs-on: ubuntu-latest
     steps:
@@ -32,3 +43,15 @@ jobs:
 
       # Check that code is correctly formatted
       - run: deno fmt --check
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')  # Ensure the step runs only on versioned tags
+    steps:
+      # Publish to JSR
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+
+      # Publish to JSR
+      - run: deno publish
