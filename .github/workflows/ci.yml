@@ -2,15 +2,6 @@
 
 on: [push,pull_request]
 
-# Set DENO_DIR to an absolute or relative path on the runner.
-# gh secret set DENO_AUTH_TOKENS --body "$DENO_AUTH_TOKENS"
-# gh secret set CODECOV_TOKEN --body "$CODECOV_TOKEN"
-# gh secret set GOOGLE_CREDENTIALS < manager.json
-
-#env:
-#  DENO_AUTH_TOKENS: ${{ secrets.DENO_AUTH_TOKENS }}
-#  DENO_DIR: .cache
-
 jobs:
 
   build:
@@ -22,7 +13,6 @@ jobs:
       # Checkout and test
       - { name: "🔽 Checkout code", uses: "actions/checkout@v4" }
       - { name: "⚙️ Setup Deno", uses: "denoland/setup-deno@v2" }
-      # - { name: "🗄️ Caching dependencies", uses: "denoland/setup-deno@v2", with: { path: ${{ env.DENO_DIR }}, key: ${{ hashFiles('deno.lock') }} } }
       - { name: "🧪 Running Tests", run: "deno test --allow-all --coverage=cov/" }
       - { name: "🔀 Transforming Coverage Format", run: "deno coverage --lcov cov/ > cov.lcov" }
       - { name: "🎨 Ensuring code is formatted correctly", run: "deno fmt --check" }
