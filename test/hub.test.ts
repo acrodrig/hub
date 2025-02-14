@@ -3,7 +3,7 @@
 import { assertEquals, assertMatch } from "@std/assert";
 import { delay } from "jsr:@std/async";
 import * as colors from "@std/fmt/colors";
-import { color, DEFAULTS, hub } from "../src/hub.ts";
+import { color, CONSOLE, DEFAULTS, hub } from "../src/hub.ts";
 
 // We set a buffer to capture console.log messages
 const buffer = DEFAULTS.buffer = [];
@@ -62,27 +62,28 @@ Deno.test("Objects via inspect (one line)", () => {
   assertEquals((buffer[0][1][1] as string).split("Person").length, 26);
 });
 
-// Deno.test("Console Replacement", () => {
-//   const ns = ":console:", prefix = color(ns, true);
-//
-//   // Replace the native console (start)
-//   // deno-lint-ignore no-global-assign
-//   console = hub(ns, undefined, true);
-//
-//   // Test validity
-//   console.warn("warn");
-//   assertEquals(buffer, [["warn", ["🟡 " + prefix + " warn", buffer[0][1][1]]]]);
-//
-//   // Test validity
-//   console.log("log");
-//   assertEquals(buffer, [["warn", ["🟡 " + prefix + " warn", buffer[0][1][1]]], ["log", ["📣 " + prefix + " log", buffer[1][1][1]]]]);
-//   assertEquals(buffer.length, 2);
-//
-//   // End the replacement
-//   // deno-lint-ignore no-global-assign
-//   console = DEFAULTS.console;
-//
-//   // Test validity (buffer no longer increments)
-//   console.error("error");
-//   assertEquals(buffer.length, 2);
-// });
+Deno.test("Console Replacement", () => {
+  buffer.length = 0;
+  const ns = ":console:", prefix = color(ns, true);
+
+  // Replace the native console (start)
+  // deno-lint-ignore no-global-assign
+  console = hub(ns, undefined, { logAlso: true });
+
+  // Test validity
+  console.warn("warn");
+  assertEquals(buffer, [["warn", ["🟡 " + prefix + " warn", buffer[0][1][1]]]]);
+
+  // Test validity
+  console.log("log");
+  assertEquals(buffer, [["warn", ["🟡 " + prefix + " warn", buffer[0][1][1]]], ["log", ["📣 " + prefix + " log", buffer[1][1][1]]]]);
+  assertEquals(buffer.length, 2);
+
+  // End the replacement
+  // deno-lint-ignore no-global-assign
+  console = CONSOLE;
+
+  // Test validity (buffer no longer increments)
+  console.error("error");
+  assertEquals(buffer.length, 2);
+});

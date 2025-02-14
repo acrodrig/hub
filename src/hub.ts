@@ -28,12 +28,13 @@ import util from "node:util";
 export const LEVELS: string[] = ["debug", "info", "warn", "error", "off", "log"] as const;
 export const ICONS: string[] = ["🟢", "🔵", "🟡", "🔴", "🔕", "📣"] as const;
 export const COLORS = [colors.red, colors.yellow, colors.blue, colors.magenta, colors.cyan] as const;
+export const CONSOLE = globalThis.console;
 
 // Defaults
 export const DEFAULTS = {
   buffer: undefined as unknown[][] | undefined,
   compact: true,
-  console: globalThis.console,
+  console: undefined as Console | undefined,
   fileLine: false,
   icons: true,
   level: "info" as typeof LEVELS[number],
@@ -57,16 +58,16 @@ function color(ns: string, apply = false, bold = true): string | number {
 // Utility function to prefix the output (with namespace, fileLine, etc). We need to do this
 // because we want to be 100% compatible with the console object
 
-function parameters(args: unknown[], ns: string, level: number, options: { fileLine?: boolean; icons?: boolean; time?: boolean; icon?: string }): unknown[] {
+function parameters(args: unknown[], ns: string, level: number, options: { icon?: string }): unknown[] {
   // Add colors to the namespace (Deno takes care of removing if no TTY?)
   let prefix = color(ns, true, true) as string;
 
   // Figure fileLine option(s)
-  const [f, l] = (options.fileLine ? new Error().stack?.split("\n")[3].split("/").pop()?.split(":") : []) as string[];
-  if (options.fileLine) prefix = colors.underline(colors.white("[" + f + ":" + l + "]")) + " " + prefix;
+  const [f, l] = (DEFAULTS.fileLine ? new Error().stack?.split("\n")[3].split("/").pop()?.split(":") : []) as string[];
+  if (DEFAULTS.fileLine) prefix = colors.underline(colors.white("[" + f + ":" + l + "]")) + " " + prefix;
 
   // Should we add icons?
-  if (options.icons) prefix = (options.icon ?? ICONS[level]) + " " + prefix;
+  if (DEFAULTS.icons) prefix = (options.icon ?? ICONS[level]) + " " + prefix;
 
   // If compact is true apply util.instpect to all arguments being objects
   const noColor = Deno.env.get("NO_COLOR") !== undefined;
@@ -80,7 +81,7 @@ function parameters(args: unknown[], ns: string, level: number, options: { fileL
   if (length > 1000) throw new Error("Buffer is just meant for tests. If it has grown beyond '1,000' it probably means that you left it on by mistake.");
 
   // Should we add time?
-  if (options.time) args.push(COLORS[color(ns) as number]("+" + performance.measure(ns).duration.toFixed(2).toString() + "ms"));
+  if (DEFAULTS.time) args.push(COLORS[color(ns) as number]("+" + performance.measure(ns).duration.toFixed(2).toString() + "ms"));
 
   return args;
 }
@@ -89,9 +90,11 @@ function parameters(args: unknown[], ns: string, level: number, options: { fileL
  * Function to setup flags based on DEBUG environment variable. Used to enable
  * based on space or comma-delimited names.
  *
+ * @param defaults - default options
  * @param debug - debug string
  */
-export function setup(debug: string = Deno.env.get("DEBUG") ?? ""): void {
+export function setup(defaults?: typeof DEFAULTS, debug: string = Deno.env.get("DEBUG") ?? ""): void {
+  if (defaults) Object.assign(DEFAULTS, defaults);
   // Empty set, add all elements and return a copy
   enabled.clear();
   for (const ns of debug.split(/[\s,]+/)) enabled.add(ns);
@@ -124,10 +127,9 @@ export function hub(ns: string, level?: typeof LEVELS[number], options: { logAls
   cache.set(ns, instance);
 
   // Get a pointer to the console to use internally (will be changed for testing)
-  const c = DEFAULTS.console;
+  const c = DEFAULTS.console ?? CONSOLE;
 
   // Add special version of `debug/info/warn/error`
-  Object.assign(options, DEFAULTS);
   // deno-lint-ignore no-explicit-any
   LEVELS.slice(0, 4).forEach((l, i) => (instance as any)[l] = (...args: unknown[]) => n <= i ? (c as any)[l](...parameters(args, ns, i, options)) : () => {});
 
