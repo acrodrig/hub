@@ -87,3 +87,22 @@ Deno.test("Console Replacement", () => {
   console.error("error");
   assertEquals(buffer.length, 2);
 });
+
+Deno.test("On/Off switch", () => {
+  buffer.length = 0;
+  const log = hub("test");
+
+  // Before turning off
+  log.debug("1");
+  assertEquals(buffer.length, 1);
+
+  // After turning off
+  hub(false);
+  log.debug("2");
+  assertEquals(buffer.length, 1);
+
+  // After turning on
+  hub(true);
+  log.debug("3");
+  assertEquals(buffer.length, 2);
+});

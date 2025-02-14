@@ -41,6 +41,9 @@ export const DEFAULTS = {
   time: true,
 };
 
+// Private ON/OFF switch
+let onOff = true;
+
 // Cache of all instances created
 const cache = new Map<string, Console & { level: string }>();
 
@@ -102,12 +105,15 @@ export function setup(defaults?: typeof DEFAULTS, debug: string = Deno.env.get("
 
 /**
  * Creates a dash object (which you can think of as a soup-up console)
- * @param ns - Namespace, which is the name of the logger
+ * @param ns - Namespace, which is the name of the logger. Special values 'true' and 'false' will enable all or disable all
  * @param level - Level of logging
  * @param options - options for creation of logger
  * @returns - extended console
  */
-export function hub(ns: string, level?: typeof LEVELS[number], options: { logAlso?: boolean; icon?: string } = {}): Console & { level: string } {
+export function hub(ns: boolean | string, level?: typeof LEVELS[number], options: { logAlso?: boolean; icon?: string } = {}): Console & { level: string } {
+  // deno-lint-ignore no-explicit-any
+  if (typeof ns === "boolean") return onOff = ns as any;
+
   // Has it been created before? Only use cache if we are not changing options
   let instance = cache.get(ns);
   if (instance && level) instance.level = level;
@@ -131,7 +137,7 @@ export function hub(ns: string, level?: typeof LEVELS[number], options: { logAls
 
   // Add special version of `debug/info/warn/error`
   // deno-lint-ignore no-explicit-any
-  LEVELS.slice(0, 4).forEach((l, i) => (instance as any)[l] = (...args: unknown[]) => n <= i ? (c as any)[l](...parameters(args, ns, i, options)) : () => {});
+  LEVELS.slice(0, 4).forEach((l, i) => (instance as any)[l] = (...args: unknown[]) => n <= i  && onOff ? (c as any)[l](...parameters(args, ns, i, options)) : () => {});
 
   // Replace the console.log in a different way that does not depend on levels
   if (options.logAlso) instance.log = (...args: unknown[]) => c.log(...parameters(args, ns, 5, options));
