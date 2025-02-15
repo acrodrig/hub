@@ -5,5 +5,5 @@ on: [push,pull_request]
 jobs:
 
   ci:
-    uses: acrodrig/.github/workflows/ci.yml@main
+    uses: acrodrig/dotfiles/.github/workflows/ci.yml@master
     with: { publish: true }
