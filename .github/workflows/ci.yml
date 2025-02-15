@@ -4,33 +4,6 @@ on: [push,pull_request]
 
 jobs:
 
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      # Debug
-      # - { name: "🐞 Debug Github Context", uses: "echo '${{ toJson(github) }}'" }
-
-      # Checkout and test
-      - { name: "🔽 Checkout code", uses: "actions/checkout@v4" }
-      - { name: "⚙️ Setup Deno", uses: "denoland/setup-deno@v2" }
-      - { name: "🧪 Running Tests", run: "deno test --allow-all --coverage=cov/" }
-      - { name: "🔀 Transforming Coverage Format", run: "deno coverage --lcov cov/ > cov.lcov" }
-      - { name: "🎨 Ensuring code is formatted correctly", run: "deno fmt --check" }
-
-      # Upload to Codecov (see https://github.com/marketplace/actions/codecov)
-      - name: "☂️ Upload Test Coverage"
-        uses: codecov/codecov-action@v5
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: cov.lcov
-          fail_ci_if_error: true
-
-  publish:
-    needs: build
-    runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/')
-    permissions: { contents: read, id-token: write }
-    steps:
-      - { name: "🔽 Checkout code", uses: "actions/checkout@v4" }
-      - { name: "⚙️ Setup Deno", uses: "denoland/setup-deno@v2" }
-      - { name: "📦 Publish to JSR", run: "deno publish --set-version ${{ github.ref_name }}" }
+  ci:
+    uses: acrodrig/.github/workflows/ci.yml@main
+    with: { publish: true }
