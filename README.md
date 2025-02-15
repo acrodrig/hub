@@ -4,7 +4,7 @@
 Hub is a lightweight and opinionated logging utility designed as a spiritual successor to [debug-js](https://github.com/debug-js/debug). It simplifies logging by wrapping the `console` object and supports multiple logging levels. This tool is useful for debugging applications without the overhead of managing different console statements manually.
 
 ## Features
-- **Multiple Logging Levels**: Supports `debug`, `info`, `warn`, `error`, `off`, and `log`.
+- **Multiple Logging Levels**: Supports `debug`, `info`, `warn`, `error`
 - **Namespace Support**: Enables logging based on environment variables.
 - **Color-Coded Output**: Uses distinct colors to differentiate log messages.
 - **Icons for Readability**: Adds relevant icons to log messages.
@@ -71,22 +71,6 @@ const logger = hub("testLogger");
 logger.info("Testing buffered log");
 console.log(DEFAULTS.buffer); // View stored logs
 ```
-
-## API Reference
-
-### `hub(ns: string, level?: string, logAlso?: boolean) => Console`
-Creates a namespaced logger.
-
-- `ns`: The namespace for the logger.
-- `level` _(optional)_: The log level (`debug`, `info`, `warn`, `error`, `off`). Defaults to `info`.
-- `logAlso` _(optional)_: If `true`, will replace `console.log` behavior.
-
-**Returns**: A console-like object with additional functionalities.
-
-### `setup(debug?: string) => void`
-Configures logging based on the `DEBUG` environment variable.
-
-- `debug`: A comma or space-separated list of enabled namespaces.
 
 ## Contributing
 1. Fork the repository.
