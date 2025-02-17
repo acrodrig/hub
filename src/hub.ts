@@ -84,7 +84,8 @@ function parameters(args: unknown[], ns: string, level: number, options: { icon?
   if (length > 1000) throw new Error("Buffer is just meant for tests. If it has grown beyond '1,000' it probably means that you left it on by mistake.");
 
   // Should we add time?
-  if (DEFAULTS.time) args.push(COLORS[color(ns) as number]("+" + performance.measure(ns).duration.toFixed(2).toString() + "ms"));
+  if (DEFAULTS.time) args.push(COLORS[color(ns) as number]("+" + performance.measure(ns, ns).duration.toFixed(2).toString() + "ms"));
+  performance.mark(ns);
 
   return args;
 }

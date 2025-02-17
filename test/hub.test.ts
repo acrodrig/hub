@@ -1,6 +1,6 @@
 #!/usr/bin/env -S deno test -A
 
-import { assertEquals, assertMatch } from "@std/assert";
+import { assertEquals, assertGreaterOrEqual, assertLess, assertMatch } from "@std/assert";
 import { delay } from "jsr:@std/async";
 import * as colors from "@std/fmt/colors";
 import { color, CONSOLE, DEFAULTS, hub } from "../src/hub.ts";
@@ -43,6 +43,26 @@ Deno.test("File/Lines and Time (with debug level)", async () => {
   const time = buffer[0][1][1];
   assertEquals(buffer, [["debug", [fileLine + " " + prefix + " debug", buffer[0][1][1]]]]);
   assertMatch(time, /\+\d+\.\d+ms/);
+});
+
+Deno.test("Time Measurements", async () => {
+  buffer.length = 0;
+  Object.assign(DEFAULTS, reset, { compact: true });
+
+  const log = hub("test");
+
+  // Create a long array and print it in different ways
+  log.info("one");
+  await delay(5);
+  log.info("two");
+  await delay(3);
+  log.info("three");
+
+  const [ _t1, t2, t3 ] = buffer.map((b) => parseInt(colors.stripAnsiCode(b[1][1])));
+  assertGreaterOrEqual(t2, 5);
+  assertLess(t2, 5 + 2);
+  assertGreaterOrEqual(t3, 3);
+  assertLess(t3, 3 + 2);
 });
 
 Deno.test("Objects via inspect (one line)", () => {
