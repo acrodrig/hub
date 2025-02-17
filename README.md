@@ -60,7 +60,7 @@ export DEBUG="*"           # Enables logging for all namespaces
 ```
 
 ### Buffering Logs (for Testing)
-Hub includes an internal buffer for testing scenarios:
+Hub includes an internal buffer for testing scenarios. It will throw after a 1000 lines have been accumulated.
 
 ```typescript
 import { DEFAULTS } from "./hub.ts";
