@@ -1,7 +1,7 @@
 # Hub
 
 ## Overview
-Hub is a lightweight and opinionated logging utility designed as a spiritual successor to [debug-js](https://github.com/debug-js/debug). It simplifies logging by wrapping the `console` object and supports multiple logging levels. This tool is useful for debugging applications without the overhead of managing different console statements manually.
+Hub is a lightweight and opinionated logging utility plus a spiritual successor to [debug-js](https://github.com/debug-js/debug). It simplifies logging by wrapping the `console` object and supports multiple logging levels. This tool is useful for debugging applications without the overhead of managing different console statements manually.
 
 ## Features
 - **Multiple Logging Levels**: Supports `debug`, `info`, `warn`, `error`
