@@ -1,9 +1,7 @@
-# See https://deno.land/manual/advanced/continuous_integration
-
 on: [push,pull_request]
 
 jobs:
-
   ci:
-    uses: acrodrig/dotfiles/.github/workflows/ci.yml@master
+    uses: acrodrig/dots/.github/workflows/ci.yml@main
     with: { publish: true }
+    secrets: inherit

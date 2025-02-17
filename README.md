@@ -5,17 +5,15 @@ Hub is a lightweight and opinionated logging utility designed as a spiritual suc
 
 ## Features
 - **Multiple Logging Levels**: Supports `debug`, `info`, `warn`, `error`
-- **Namespace Support**: Enables logging based on environment variables.
+- **Namespace Support**: Enables DEBUG logging based on environment variables.
 - **Color-Coded Output**: Uses distinct colors to differentiate log messages.
-- **Icons for Readability**: Adds relevant icons to log messages.
-- **Buffering for Testing**: Logs can be buffered and later reviewed.
-- **Performance Marking**: Measures execution time between log statements.
+- **Icons for Readability**: Adds relevant icons (i.e. emojis) to log messages.
+- **Performance Marking**: Measures sub-millisecond execution time between log statements.
 - **Minimalistic and Lightweight**: No dependencies beyond standard libraries.
 
 ## Differences from debug-js
-- Does **not** support the `inspect` option.
 - Works across all log levels, not just `debug`.
-- Uses only the `:` separator for namespacing.
+- Does not have wildcards for now for simplicity
 
 ## Installation
 This project is built for use with Deno, ensuring compatibility with modern JavaScript/TypeScript applications.
@@ -81,4 +79,3 @@ console.log(DEFAULTS.buffer); // View stored logs
 
 ## License
 This project is open-source and available under the MIT License.
-
