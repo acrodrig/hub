@@ -58,7 +58,7 @@ Deno.test("Time Measurements", async () => {
   await delay(3);
   log.info("three");
 
-  const [ _t1, t2, t3 ] = buffer.map((b) => parseInt(colors.stripAnsiCode(b[1][1])));
+  const [_t1, t2, t3] = buffer.map((b) => parseInt(colors.stripAnsiCode(b[1][1])));
   assertGreaterOrEqual(t2, 5);
   assertLess(t2, 5 + 2);
   assertGreaterOrEqual(t3, 3);
