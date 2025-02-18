@@ -104,22 +104,24 @@ export function setup(defaults?: typeof DEFAULTS, debug: string = Deno.env.get("
   for (const ns of debug.split(/[\s,]+/)) enabled.add(ns);
 }
 
+export function hub(ns: boolean): boolean;
+export function hub(ns: string, level?: typeof LEVELS[number], options?: { icon?: string }): Console & { level: string };
+
 /**
  * Creates a dash object (which you can think of as a soup-up console)
- * @param ns - Namespace, which is the name of the logger. Special values 'true' and 'false' will enable all or disable all
+ * @param nsOrOnOff - Namespace, which is the name of the logger. Special values 'true' and 'false' will enable all or disable all
  * @param level - Level of logging
  * @param options - options for creation of logger
  * @returns - extended console
  */
-export function hub(ns: boolean | string, level?: typeof LEVELS[number], options: { icon?: string } = {}): Console & { level: string } {
-  // deno-lint-ignore no-explicit-any
-  if (typeof ns === "boolean") return onOff = ns as any;
+export function hub(nsOrOnOff: boolean | string, level?: typeof LEVELS[number], options: { icon?: string } = {}): boolean | Console & { level: string } {
+  if (typeof nsOrOnOff === "boolean") return onOff = nsOrOnOff;
 
   // Has it been created before? Only use cache if we are not changing options
-  let instance = cache.get(ns) as Console & { level: string; time: number; options: unknown };
+  const ns = nsOrOnOff;
+  let instance = cache.get(ns) as Console & { level: string; time: number; options: { icon?: string } };
   if (instance && level) instance.level = level;
-  // deno-lint-ignore no-explicit-any
-  if (instance && options) Object.assign(instance.options as any, options);
+  if (instance && options) Object.assign(instance.options, options);
   if (instance) return instance as Console & { level: string };
 
   // If we have not passed an *explicit* level and the namespace is enabled, set it to debug
@@ -137,7 +139,7 @@ export function hub(ns: boolean | string, level?: typeof LEVELS[number], options
     set level(l: typeof LEVELS[number]) { n = LEVELS.indexOf(l); },
     // time: Date.now(),
     options
-  } as Console & { level: string, time: number, options: unknown };
+  } as Console & { level: string, time: number, options: { icon?: string } };
   cache.set(ns, instance);
 
   // Get a pointer to the console to use internally (will be changed for testing)
