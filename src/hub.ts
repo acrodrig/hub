@@ -111,13 +111,14 @@ export function setup(defaults?: typeof DEFAULTS, debug: string = Deno.env.get("
  * @param options - options for creation of logger
  * @returns - extended console
  */
-export function hub(ns: boolean | string, level?: typeof LEVELS[number], options: { logAlso?: boolean; icon?: string } = {}): Console & { level: string } {
+export function hub(ns: boolean | string, level?: typeof LEVELS[number], options: { icon?: string } = {}): Console & { level: string } {
   // deno-lint-ignore no-explicit-any
   if (typeof ns === "boolean") return onOff = ns as any;
 
   // Has it been created before? Only use cache if we are not changing options
-  let instance = cache.get(ns);
+  let instance = cache.get(ns) as Console & { level: string, time: number, options: any };
   if (instance && level) instance.level = level;
+  if (instance && options) Object.assign(instance.options, options);
   if (instance) return instance as Console & { level: string };
 
   // If we have not passed an *explicit* level and the namespace is enabled, set it to debug
@@ -130,7 +131,12 @@ export function hub(ns: boolean | string, level?: typeof LEVELS[number], options
   performance.mark(ns);
 
   // deno-fmt-ignore
-  instance = { get level() { return LEVELS[n]; }, set level(l: typeof LEVELS[number]) { n = LEVELS.indexOf(l); }, time: Date.now() } as Console & { level: string, time: number };
+  instance = {
+    get level() { return LEVELS[n]; },
+    set level(l: typeof LEVELS[number]) { n = LEVELS.indexOf(l); },
+    // time: Date.now(),
+    options
+  } as Console & { level: string, time: number, options: unknown };
   cache.set(ns, instance);
 
   // Get a pointer to the console to use internally (will be changed for testing)
@@ -139,9 +145,6 @@ export function hub(ns: boolean | string, level?: typeof LEVELS[number], options
   // Add special version of `debug/info/warn/error`
   // deno-lint-ignore no-explicit-any
   LEVELS.slice(0, 4).forEach((l, i) => (instance as any)[l] = (...args: unknown[]) => n <= i && onOff ? (c as any)[l](...parameters(args, ns, i, options)) : () => {});
-
-  // Replace the console.log in a different way that does not depend on levels
-  if (options.logAlso) instance.log = (...args: unknown[]) => c.log(...parameters(args, ns, 5, options));
 
   // Return completed prototype. It will NOT overwrite the previously defined functions
   // NOTE: By deleting the custom object versions we can go back to the prototype versions

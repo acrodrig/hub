@@ -88,15 +88,15 @@ Deno.test("Console Replacement", () => {
 
   // Replace the native console (start)
   // deno-lint-ignore no-global-assign
-  console = hub(ns, undefined, { logAlso: true });
+  console = hub(ns, undefined);
 
   // Test validity
   console.warn("warn");
   assertEquals(buffer, [["warn", ["🟡 " + prefix + " warn", buffer[0][1][1]]]]);
 
   // Test validity
-  console.log("log");
-  assertEquals(buffer, [["warn", ["🟡 " + prefix + " warn", buffer[0][1][1]]], ["log", ["📣 " + prefix + " log", buffer[1][1][1]]]]);
+  console.info("info");
+  assertEquals(buffer, [["warn", ["🟡 " + prefix + " warn", buffer[0][1][1]]], ["info", ["🔵 " + prefix + " info", buffer[1][1][1]]]]);
   assertEquals(buffer.length, 2);
 
   // End the replacement
