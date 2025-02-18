@@ -65,6 +65,25 @@ Deno.test("Time Measurements", async () => {
   assertLess(t3, 3 + 2);
 });
 
+Deno.test("Unique Instances", async () => {
+  buffer.length = 0;
+  Object.assign(DEFAULTS, reset, { compact: true });
+
+  const log1 = hub("test");
+  const log2 = hub("test");
+  assertEquals(log1, log2);
+
+  // Create a long array and print it in different ways
+  log1.info("from 1");
+  log2.info("from 2");
+  assertEquals(buffer.length, 2);
+
+  const log3 = hub("test", "error");
+  log1.warn("from 1");
+  log2.error("from 2");
+  assertEquals(buffer.length, 3);
+});
+
 Deno.test("Objects via inspect (one line)", () => {
   buffer.length = 0;
   Object.assign(DEFAULTS, reset, { compact: true });
