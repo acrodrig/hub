@@ -148,6 +148,7 @@ export function hub(nsOrOnOff: boolean | string, level?: typeof LEVELS[number], 
   // Add special version of `debug/info/warn/error`
   // deno-lint-ignore no-explicit-any
   LEVELS.slice(0, 4).forEach((l, i) => (instance as any)[l] = (...args: unknown[]) => n <= i && onOff ? (c as any)[l](...parameters(args, ns, i, options)) : () => {});
+  instance.trace = (...args: unknown[]) => onOff ? c.trace(...args) : undefined;
 
   // Return completed prototype. It will NOT overwrite the previously defined functions
   // NOTE: By deleting the custom object versions we can go back to the prototype versions
