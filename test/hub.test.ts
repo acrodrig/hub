@@ -65,7 +65,7 @@ Deno.test("Time Measurements", async () => {
   assertLess(t3, 3 + 2);
 });
 
-Deno.test("Unique Instances", async () => {
+Deno.test("Unique Instances", () => {
   buffer.length = 0;
   Object.assign(DEFAULTS, reset, { compact: true });
 
@@ -78,7 +78,7 @@ Deno.test("Unique Instances", async () => {
   log2.info("from 2");
   assertEquals(buffer.length, 2);
 
-  const log3 = hub("test", "error");
+  const _log3 = hub("test", "error");
   log1.warn("from 1");
   log2.error("from 2");
   assertEquals(buffer.length, 3);

@@ -116,9 +116,10 @@ export function hub(ns: boolean | string, level?: typeof LEVELS[number], options
   if (typeof ns === "boolean") return onOff = ns as any;
 
   // Has it been created before? Only use cache if we are not changing options
-  let instance = cache.get(ns) as Console & { level: string, time: number, options: any };
+  let instance = cache.get(ns) as Console & { level: string; time: number; options: unknown };
   if (instance && level) instance.level = level;
-  if (instance && options) Object.assign(instance.options, options);
+  // deno-lint-ignore no-explicit-any
+  if (instance && options) Object.assign(instance.options as any, options);
   if (instance) return instance as Console & { level: string };
 
   // If we have not passed an *explicit* level and the namespace is enabled, set it to debug
