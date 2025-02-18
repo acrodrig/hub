@@ -28,27 +28,27 @@ import { hub, setup } from "./hub.ts";
 Create a logger instance for a specific namespace:
 
 ```typescript
-const logger = hub("myNamespace");
-logger.info("This is an info message");
-logger.debug("This is a debug message");
-logger.error("Something went wrong");
+const log = hub("myNamespace");
+log.info("This is an info message");
+log.debug("This is a debug message");
+log.error("Something went wrong");
 ```
 
 ### Logging Levels
 You can define the logging level to control verbosity:
 
 ```typescript
-const logger = hub("myNamespace", "warn");
-logger.info("This won't be printed");
-logger.warn("This will be printed");
+const log = hub("myNamespace", "warn");
+log.info("This won't be printed");
+log.warn("This will be printed");
 ```
 
 ### Overriding Console.log
 If you want `hub` to handle `console.log`, you can enable it explicitly:
 
 ```typescript
-const logger = hub("myNamespace", "debug", true);
-logger.log("This message will go through hub");
+const log = hub("myNamespace", "debug", true);
+log.log("This message will go through hub");
 ```
 
 ### Using Environment Variables
@@ -65,8 +65,8 @@ Hub includes an internal buffer for testing scenarios. It will throw after a 100
 ```typescript
 import { DEFAULTS } from "./hub.ts";
 DEFAULTS.buffer = [];
-const logger = hub("testLogger");
-logger.info("Testing buffered log");
+const log = hub("testLogger");
+log.info("Testing buffered log");
 console.log(DEFAULTS.buffer); // View stored logs
 ```
 
