@@ -14,7 +14,14 @@
     "@std/async": "jsr:@std/async@^1",
     "@std/fmt": "jsr:@std/fmt@^1"
   },
-  "exclude": [ ".cache" ],
+  "publish": {
+    "include": [
+      "LICENSE",
+      "README.md",
+      "mod.ts",
+      "src/**/*.ts"
+    ]
+  },
   "tasks": {
     "check": "deno check **/*.ts && deno lint && deno fmt --check",
     "lint": "deno lint src test",
