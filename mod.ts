@@ -1,1 +1,1 @@
-export { CONSOLE, DEFAULTS, hub, LEVELS, setup } from "./src/hub.ts";
+export { CONSOLE, hub, LEVELS, setup } from "./src/hub.ts";

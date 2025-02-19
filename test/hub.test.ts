@@ -3,15 +3,18 @@
 import { assertEquals, assertGreaterOrEqual, assertLess, assertMatch } from "@std/assert";
 import { delay } from "jsr:@std/async";
 import * as colors from "@std/fmt/colors";
-import { color, CONSOLE, DEFAULTS, hub } from "../src/hub.ts";
+import { color, CONSOLE, hub, setup } from "../src/hub.ts";
 
 // We set a buffer to capture console.log messages
-const buffer = DEFAULTS.buffer = [];
-const reset = { ...DEFAULTS };
+const buffer = [] as string[][];
+const reset = (options: Record<string, unknown> = {}) => {
+  buffer.length = 0;
+  const defaults = { buffer, compact: true, defaultLevel: "info", fileLine: false, icons: true, time: true };
+  setup(Object.assign({}, defaults, options));
+};
 
 Deno.test("Basic", () => {
-  buffer.length = 0;
-  Object.assign(DEFAULTS, reset, { fileLine: false, icons: true, time: false });
+  reset({ fileLine: false, icons: true, time: false });
 
   const log = hub("test");
 
@@ -28,8 +31,7 @@ Deno.test("Basic", () => {
 });
 
 Deno.test("File/Lines and Time (with debug level)", async () => {
-  buffer.length = 0;
-  Object.assign(DEFAULTS, reset, { fileLine: true, icons: false, time: true });
+  reset({ fileLine: true, icons: false, time: true });
 
   const log = hub("test", "debug");
 
@@ -39,15 +41,14 @@ Deno.test("File/Lines and Time (with debug level)", async () => {
 
   // Test validity
   const prefix = color("test", true);
-  const fileLine = colors.underline(colors.white("[hub.test.ts:36]"));
+  const fileLine = colors.underline(colors.white("[hub.test.ts:38]"));
   const time = buffer[0][1][1];
   assertEquals(buffer, [["debug", [fileLine + " " + prefix + " debug", buffer[0][1][1]]]]);
   assertMatch(time, /\+\d+\.\d+ms/);
 });
 
 Deno.test("Time Measurements", async () => {
-  buffer.length = 0;
-  Object.assign(DEFAULTS, reset, { compact: true });
+  reset({ compact: true });
 
   const log = hub("test");
 
@@ -65,9 +66,20 @@ Deno.test("Time Measurements", async () => {
   assertLess(t3, 3 + 2);
 });
 
+Deno.test("Logging Error Objects", () => {
+  reset({ compact: true });
+
+  const log = hub("test");
+
+  try {
+    throw new Error("This is an error");
+  } catch (error) {
+    log.error(error);
+  }
+});
+
 Deno.test("Unique Instances", () => {
-  buffer.length = 0;
-  Object.assign(DEFAULTS, reset, { compact: true });
+  reset({ compact: true });
 
   const log1 = hub("test");
   const log2 = hub("test");
@@ -85,8 +97,7 @@ Deno.test("Unique Instances", () => {
 });
 
 Deno.test("Objects via inspect (one line)", () => {
-  buffer.length = 0;
-  Object.assign(DEFAULTS, reset, { compact: true });
+  reset({ compact: true });
 
   const log = hub("test", "debug");
 
@@ -102,12 +113,13 @@ Deno.test("Objects via inspect (one line)", () => {
 });
 
 Deno.test("Console Replacement", () => {
-  buffer.length = 0;
+  reset();
+
   const ns = ":console:", prefix = color(ns, true);
 
   // Replace the native console (start)
   // deno-lint-ignore no-global-assign
-  console = hub(ns, undefined);
+  console = hub(ns);
 
   // Test validity
   console.warn("warn");
@@ -128,7 +140,8 @@ Deno.test("Console Replacement", () => {
 });
 
 Deno.test("On/Off switch", () => {
-  buffer.length = 0;
+  reset();
+
   const log = hub("test");
 
   // Before turning off

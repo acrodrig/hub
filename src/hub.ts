@@ -25,9 +25,11 @@ import util from "node:util";
  * - It only allows for the ':' separator
  */
 
-export const LEVELS: string[] = ["debug", "info", "warn", "error", "off", "log"] as const;
-export const ICONS: string[] = ["🟢", "🔵", "🟡", "🔴", "🔕", "📣"] as const;
+export const LEVELS: string[] = ["debug", "info", "warn", "error", "off"] as const;
+export const ICONS: string[] = ["🟢", "🔵", "🟡", "🔴", "🔕"] as const;
 export const COLORS = [colors.red, colors.yellow, colors.blue, colors.magenta, colors.cyan] as const;
+
+// Original console if you ever want to go back to it
 export const CONSOLE = globalThis.console;
 
 // Defaults
@@ -35,11 +37,11 @@ export const DEFAULTS = {
   buffer: undefined as unknown[][] | undefined,
   compact: true,
   console: undefined as Console | undefined,
-  fileLine: false,
+  defaultLevel: "info" as typeof LEVELS[number],
+  fileLine: true,
   icons: true,
-  level: "info" as typeof LEVELS[number],
   time: true,
-};
+} as const;
 
 // Private ON/OFF switch
 let onOff = true;
@@ -48,7 +50,7 @@ let onOff = true;
 const cache = new Map<string, Console & { level: string }>();
 
 // Set of rules to determine whether to enable a debug namespace
-const enabled = new Set<string>();
+const enabled = new Set<string>(Deno.env.get("DEBUG")?.trim().split(/[\s,]+/));
 
 // Utility function color deterministically based on the hash of the namespace (using djb2 XOR version)
 // See https://gist.github.com/eplawless/52813b1d8ad9af510d85
@@ -61,13 +63,14 @@ function color(ns: string, apply = false, bold = true): string | number {
 // Utility function to prefix the output (with namespace, fileLine, etc). We need to do this
 // because we want to be 100% compatible with the console object
 
-function parameters(args: unknown[], ns: string, level: number, options: { icon?: string }): unknown[] {
+function parameters(args: unknown[], ns: string, level: number, options: { icon?: string; fileLine?: boolean }): unknown[] {
   // Add colors to the namespace (Deno takes care of removing if no TTY?)
   let prefix = color(ns, true, true) as string;
 
   // Figure fileLine option(s)
-  const [f, l] = (DEFAULTS.fileLine ? new Error().stack?.split("\n")[3].split("/").pop()?.split(":") : []) as string[];
-  if (DEFAULTS.fileLine) prefix = colors.underline(colors.white("[" + f + ":" + l + "]")) + " " + prefix;
+  const fileLine = DEFAULTS.fileLine || options.fileLine;
+  const [f, l] = (fileLine ? new Error().stack?.split("\n")[3].split("/").pop()?.split(":") : []) as string[];
+  if (fileLine) prefix = colors.underline(colors.white("[" + f + ":" + l + "]")) + " " + prefix;
 
   // Should we add icons?
   if (DEFAULTS.icons) prefix = (options.icon ?? ICONS[level]) + " " + prefix;
@@ -94,18 +97,17 @@ function parameters(args: unknown[], ns: string, level: number, options: { icon?
  * Function to setup flags based on DEBUG environment variable. Used to enable
  * based on space or comma-delimited names.
  *
- * @param defaults - default options
- * @param debug - debug string
+ * @param options - options for setup
  */
-export function setup(defaults?: typeof DEFAULTS, debug: string = Deno.env.get("DEBUG") ?? ""): void {
-  if (defaults) Object.assign(DEFAULTS, defaults);
-  // Empty set, add all elements and return a copy
+export function setup(options: { compact?: boolean; debug?: string; defaultLevel?: typeof LEVELS[number]; fileLine?: boolean; icons?: boolean; time?: boolean } = {}): void {
+  Object.assign(DEFAULTS, options);
+  if (!options.debug) return;
   enabled.clear();
-  for (const ns of debug.split(/[\s,]+/)) enabled.add(ns);
+  for (const ns of options.debug.split(/[\s,]+/)) enabled.add(ns);
 }
 
 export function hub(ns: boolean): boolean;
-export function hub(ns: string, level?: typeof LEVELS[number], options?: { icon?: string }): Console & { level: string };
+export function hub(ns: string, level?: typeof LEVELS[number], options?: { fileLine?: boolean, icon?: string }): Console & { level: string };
 
 /**
  * Creates a dash object (which you can think of as a soup-up console)
@@ -114,18 +116,18 @@ export function hub(ns: string, level?: typeof LEVELS[number], options?: { icon?
  * @param options - options for creation of logger
  * @returns - extended console
  */
-export function hub(nsOrOnOff: boolean | string, level?: typeof LEVELS[number], options: { icon?: string } = {}): boolean | Console & { level: string } {
+export function hub(nsOrOnOff: boolean | string, level?: typeof LEVELS[number], options: { fileLine?: boolean, icon?: string } = {}): boolean | Console & { level: string } {
   if (typeof nsOrOnOff === "boolean") return onOff = nsOrOnOff;
 
   // Has it been created before? Only use cache if we are not changing options
   const ns = nsOrOnOff;
-  let instance = cache.get(ns) as Console & { level: string; time: number; options: { icon?: string } };
+  let instance = cache.get(ns) as Console & { level: string; time: number; options: { icon?: string; fileLine?: boolean } };
   if (instance && level) instance.level = level;
   if (instance && options) Object.assign(instance.options, options);
   if (instance) return instance as Console & { level: string };
 
   // If we have not passed an *explicit* level and the namespace is enabled, set it to debug
-  level ??= enabled.has(ns) || enabled.has("*") ? "debug" : DEFAULTS.level;
+  level ??= enabled.has(ns) || enabled.has("*") ? "debug" : DEFAULTS.defaultLevel;
 
   // The outside world should never have access to `n`
   let n = LEVELS.indexOf(level);
@@ -139,7 +141,7 @@ export function hub(nsOrOnOff: boolean | string, level?: typeof LEVELS[number], 
     set level(l: typeof LEVELS[number]) { n = LEVELS.indexOf(l); },
     // time: Date.now(),
     options
-  } as Console & { level: string, time: number, options: { icon?: string } };
+  } as Console & { level: string, time: number, options: { icon?: string, fileLine?: boolean } };
   cache.set(ns, instance);
 
   // Get a pointer to the console to use internally (will be changed for testing)
@@ -154,9 +156,6 @@ export function hub(nsOrOnOff: boolean | string, level?: typeof LEVELS[number], 
   // NOTE: By deleting the custom object versions we can go back to the prototype versions
   return Object.setPrototypeOf(instance, c) as Console & { level: string };
 }
-
-// Setup
-setup();
 
 // Export private functions so that we can test
 export { color };
