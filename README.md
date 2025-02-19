@@ -1,19 +1,24 @@
 # Hub
 
 ## Overview
-Hub is a lightweight and opinionated logging utility plus a spiritual successor to [debug-js](https://github.com/debug-js/debug). It simplifies logging by wrapping the `console` object and supports multiple logging levels. This tool is useful for debugging applications without the overhead of managing different console statements manually.
+Hub is a lightweight and opinionated logging utility plus a spiritual successor 
+to [debug-js](https://github.com/debug-js/debug). It simplifies logging by 
+wrapping the `console` object and supports multiple logging levels. This tool is 
+useful for debugging applications without the overhead of managing different 
+console statements manually.
 
 ## Features
 - **Multiple Logging Levels**: Supports `debug`, `info`, `warn`, `error`
 - **Namespace Support**: Enables DEBUG logging based on environment variables.
 - **Color-Coded Output**: Uses distinct colors to differentiate log messages.
 - **Icons for Readability**: Adds relevant icons (i.e. emojis) to log messages.
+- **File names and Lines**: Prints fil/line so that you stop wondering where printout comes from
 - **Performance Marking**: Measures sub-millisecond execution time between log statements.
 - **Minimalistic and Lightweight**: No dependencies beyond standard libraries.
 
 ## Differences from debug-js
 - Works across all log levels, not just `debug`.
-- Does not have wildcards for now for simplicity
+- Does not have wildcards for simplicity
 
 ## Installation
 This project is built for use with Deno, ensuring compatibility with modern JavaScript/TypeScript applications.
