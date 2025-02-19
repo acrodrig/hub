@@ -107,7 +107,7 @@ export function setup(options: { compact?: boolean; debug?: string; defaultLevel
 }
 
 export function hub(ns: boolean): boolean;
-export function hub(ns: string, level?: typeof LEVELS[number], options?: { fileLine?: boolean, icon?: string }): Console & { level: string };
+export function hub(ns: string, level?: typeof LEVELS[number], options?: { fileLine?: boolean; icon?: string }): Console & { level: string };
 
 /**
  * Creates a dash object (which you can think of as a soup-up console)
@@ -116,7 +116,7 @@ export function hub(ns: string, level?: typeof LEVELS[number], options?: { fileL
  * @param options - options for creation of logger
  * @returns - extended console
  */
-export function hub(nsOrOnOff: boolean | string, level?: typeof LEVELS[number], options: { fileLine?: boolean, icon?: string } = {}): boolean | Console & { level: string } {
+export function hub(nsOrOnOff: boolean | string, level?: typeof LEVELS[number], options: { fileLine?: boolean; icon?: string } = {}): boolean | Console & { level: string } {
   if (typeof nsOrOnOff === "boolean") return onOff = nsOrOnOff;
 
   // Has it been created before? Only use cache if we are not changing options
