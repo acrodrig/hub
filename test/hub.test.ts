@@ -1,7 +1,7 @@
 #!/usr/bin/env -S deno test -A
 
 import { assertEquals, assertGreaterOrEqual, assertLess, assertMatch } from "@std/assert";
-import { delay } from "jsr:@std/async";
+import { delay } from "@std/async";
 import * as colors from "@std/fmt/colors";
 import { color, CONSOLE, hub, ICONS, type Options, setup } from "../src/hub.ts";
 

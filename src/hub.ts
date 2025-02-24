@@ -33,7 +33,8 @@ const COLORS = [colors.red, colors.yellow, colors.blue, colors.magenta, colors.c
 export const CONSOLE = globalThis.console;
 
 // Set of rules to determine whether to enable a debug namespace
-const DEBUGS_ALL = new Set<string>(Deno.env.get("DEBUG")?.trim().split(/[\s,]+/));
+// deno-lint-ignore no-process-global
+const DEBUGS_ALL = new Set<string>(process?.env.DEBUG?.trim().split(/[\s,]+/));
 const DEBUGS_STAR = [...DEBUGS_ALL].filter((d) => d.endsWith("*")).map((d) => d.slice(0, -1));
 
 /**
@@ -93,7 +94,8 @@ function parameters(args: unknown[], ns: string, level: number, options: Partial
   if (icons) prefix = (icons.at(level) ?? icons) + " " + prefix;
 
   // If compact is true apply util.instpect to all arguments being objects
-  const noColor = Deno.env.get("NO_COLOR") !== undefined;
+  // deno-lint-ignore no-process-global
+  const noColor = process?.env.NO_COLOR !== undefined;
   const inspectOptions = { breakLength: Infinity, colors: !noColor, compact: true, maxArrayLength: 25 };
   if (options.compact ?? defaults.compact) args = args.map((a) => typeof a === "object" ? util.inspect(a, inspectOptions) : a);
 
