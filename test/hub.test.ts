@@ -3,18 +3,18 @@
 import { assertEquals, assertGreaterOrEqual, assertLess, assertMatch } from "@std/assert";
 import { delay } from "jsr:@std/async";
 import * as colors from "@std/fmt/colors";
-import { color, CONSOLE, hub, setup } from "../src/hub.ts";
+import { color, CONSOLE, hub, ICONS, type Options, setup } from "../src/hub.ts";
 
 // We set a buffer to capture console.log messages
 const buffer = [] as string[][];
-const reset = (options: Record<string, unknown> = {}) => {
+const reset = (options: Partial<Options> = {}) => {
   buffer.length = 0;
-  const defaults = { buffer, compact: true, defaultLevel: "info", fileLine: false, icons: true, time: true };
+  const defaults = { buffer, compact: true, defaultLevel: "info", fileLine: false, icons: ICONS, timeDiff: true };
   setup(Object.assign({}, defaults, options));
 };
 
 Deno.test("Basic", () => {
-  reset({ fileLine: false, icons: true, time: false });
+  reset({ fileLine: false, timeDiff: false });
 
   const log = hub("test");
 
@@ -31,7 +31,7 @@ Deno.test("Basic", () => {
 });
 
 Deno.test("File/Lines and Time (with debug level)", async () => {
-  reset({ fileLine: true, icons: false, time: true });
+  reset({ fileLine: true, icons: undefined, timeDiff: true });
 
   const log = hub("test", "debug");
 
@@ -157,4 +157,15 @@ Deno.test("On/Off switch", () => {
   hub(true);
   log.debug("3");
   assertEquals(buffer.length, 2);
+});
+
+Deno.test("Wildcards", () => {
+  reset();
+
+  setup({}, "f*");
+  const log1 = hub("foo");
+  const log2 = hub("bar");
+  log1.debug("debug");
+  log2.debug("debug");
+  assertEquals(buffer.length, 1);
 });
