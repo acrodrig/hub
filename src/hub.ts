@@ -26,7 +26,7 @@ import util from "node:util";
  */
 
 export const LEVELS: string[] = ["debug", "info", "warn", "error", "off"] as const;
-export const ICONS: string[] = ["🟢", "🔵", "🟡", "🔴", "🔕"] as const;
+export const ICONS: string[] = ["🟢", "🔵", "🟡", "🔴", "🔕", "🟤"] as const;
 const COLORS = [colors.red, colors.yellow, colors.blue, colors.magenta, colors.cyan] as const;
 
 // Original console if you ever want to go back to it
@@ -60,7 +60,6 @@ export class Options {
 }
 
 export const DEFAULTS = new Options() as Readonly<Options>;
-const defaults = new Options();
 
 // Cache of all instances created
 const root = create("*");
@@ -80,34 +79,34 @@ function color(ns: string, apply = false, bold = true): string | number {
 // Utility function to prefix the output (with namespace, fileLine, etc). We need to do this
 // because we want to be 100% compatible with the console object
 
-function parameters(args: unknown[], ns: string, level: number, options: Partial<Options> = defaults): unknown[] {
+function parameters(args: unknown[], ns: string, level: number, options: Partial<Options> = DEFAULTS): unknown[] {
   // Add colors to the namespace (Deno takes care of removing if no TTY?)
   let prefix = color(ns, true, true) as string;
 
   // Figure fileLine option(s)
-  const fileLine = options.fileLine ?? defaults.fileLine;
+  const fileLine = options.fileLine ?? DEFAULTS.fileLine;
   const [f, l] = (fileLine ? new Error().stack?.split("\n")[3].split("/").pop()?.split(":") : []) as string[];
   if (fileLine) prefix = colors.underline(colors.white("[" + f + ":" + l + "]")) + " " + prefix;
 
   // Should we add icons?
-  const icons = options.icons ?? defaults.icons;
+  const icons = options.icons ?? DEFAULTS.icons;
   if (icons) prefix = (icons.at(level) ?? icons) + " " + prefix;
 
   // If compact is true apply util.instpect to all arguments being objects
   // deno-lint-ignore no-process-global
   const noColor = process?.env.NO_COLOR !== undefined;
   const inspectOptions = { breakLength: Infinity, colors: !noColor, compact: true, maxArrayLength: 25 };
-  if (options.compact ?? defaults.compact) args = args.map((a) => typeof a === "object" ? util.inspect(a, inspectOptions) : a);
+  if (options.compact ?? DEFAULTS.compact) args = args.map((a) => typeof a === "object" ? util.inspect(a, inspectOptions) : a);
 
   // Organize parameters
   args = typeof args.at(0) === "string" ? [prefix + " " + args.shift(), ...args] : [prefix, ...args];
 
   // Add to buffer
-  const length = defaults.buffer ? defaults.buffer.push([LEVELS[level], args]) : 0;
+  const length = DEFAULTS.buffer ? DEFAULTS.buffer.push([LEVELS[level], args]) : 0;
   if (length > 1000) throw new Error("Buffer is just meant for tests. If it has grown beyond '1,000' it probably means that you left it on by mistake.");
 
   // Should we add time?
-  const timeDiff = options.timeDiff ?? defaults.timeDiff;
+  const timeDiff = options.timeDiff ?? DEFAULTS.timeDiff;
   if (timeDiff) args.push(COLORS[color(ns) as number]("+" + performance.measure(ns, ns).duration.toFixed(2).toString() + "ms"));
   performance.mark(ns);
 
@@ -122,7 +121,7 @@ function parameters(args: unknown[], ns: string, level: number, options: Partial
  * @param debugs
  */
 export function setup(options: Partial<Options> = {}, debugs?: string): void {
-  Object.assign(defaults, options);
+  Object.assign(DEFAULTS, options);
   if (!debugs) return;
   DEBUGS_ALL.clear();
   DEBUGS_STAR.length = 0;
@@ -134,7 +133,7 @@ export function setup(options: Partial<Options> = {}, debugs?: string): void {
 
 function create(ns: string, options: Partial<Options> = {}): Console & { level: string } {
   const debug = DEBUGS_ALL.has(ns) || DEBUGS_ALL.has("*") || DEBUGS_STAR.some((d) => ns.startsWith(d));
-  let n = LEVELS.indexOf(debug ? "debug" : defaults.defaultLevel);
+  let n = LEVELS.indexOf(debug ? "debug" : DEFAULTS.defaultLevel);
 
   // Create initial instance before decorating it with console methods
   performance.mark(ns);
@@ -146,7 +145,7 @@ function create(ns: string, options: Partial<Options> = {}): Console & { level: 
   } as Console & { level: string, time: number };
 
   // Get a pointer to the console to use internally (will be changed for testing)
-  const c = defaults.console ?? CONSOLE;
+  const c = DEFAULTS.console ?? CONSOLE;
 
   // deno-lint-ignore no-explicit-any
   LEVELS.slice(0, 4).forEach((l, i) => (instance as any)[l] = (...args: unknown[]) => n <= i && onOff ? (c as any)[l](...parameters(args, ns, i, options)) : () => {});
@@ -174,5 +173,14 @@ export function hub(nsOrOnOff: boolean | string, level?: typeof LEVELS[number], 
   return instance;
 }
 
+// Automatically setup the console replacement and export it? We do this if given a hash on import
+const p = import.meta.url?.lastIndexOf("#");
+const ns = p >= 0 ? import.meta.url?.substring(p + 1) : undefined;
+const consoleReplacement = ns ? hub(ns) : CONSOLE;
+
+// Replace console.log to print file and if env variable HUB is set
+const log = console.log;
+if (Deno.env.has("HUB")) console.log = (...args: unknown[]) => log(...parameters(args, "*", 5));
+
 // Export private functions so that we can test
-export { color };
+export { color, consoleReplacement as console };
