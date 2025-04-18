@@ -79,7 +79,7 @@ function color(ns: string, apply = false, bold = true): string | number {
 // Utility function to prefix the output (with namespace, fileLine, etc). We need to do this
 // because we want to be 100% compatible with the console object
 
-function parameters(args: unknown[], ns: string, level: number, options: Partial<Options> = DEFAULTS): unknown[] {
+export function parameters(args: unknown[], ns: string, level: number, options: Partial<Options> = DEFAULTS): unknown[] {
   // Add colors to the namespace (Deno takes care of removing if no TTY?)
   let prefix = color(ns, true, true) as string;
 
@@ -173,14 +173,5 @@ export function hub(nsOrOnOff: boolean | string, level?: typeof LEVELS[number], 
   return instance;
 }
 
-// Automatically setup the console replacement and export it? We do this if given a hash on import
-const p = import.meta.url?.lastIndexOf("#");
-const ns = p >= 0 ? import.meta.url?.substring(p + 1) : undefined;
-const consoleReplacement = ns ? hub(ns) : CONSOLE;
-
-// Replace console.log to print file and if env variable HUB is set
-const log = console.log;
-if (Deno.env.has("HUB")) console.log = (...args: unknown[]) => log(...parameters(args, "*", 5));
-
 // Export private functions so that we can test
-export { color, consoleReplacement as console };
+export { color };

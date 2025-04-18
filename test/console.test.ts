@@ -1,6 +1,6 @@
 #!/usr/bin/env -S deno test -A
 
-import { console } from "../src/hub.ts#test";
+import { console } from "../mod.ts#test";
 
 // Not a test perse, but just a test to see if the console replacement works
 
