@@ -173,5 +173,9 @@ export function hub(nsOrOnOff: boolean | string, level?: typeof LEVELS[number], 
   return instance;
 }
 
+// Replace console.log to print file and if env variable HUB is set
+const log = console.log;
+if (Deno.env.has("HUB")) console.log = (...args: unknown[]) => log(...parameters(args, "*", 5));
+
 // Export private functions so that we can test
 export { color };
