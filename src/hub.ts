@@ -1,4 +1,6 @@
 import * as colors from "@std/fmt/colors";
+import { omit } from "@std/collections";
+import { resolve } from "@std/path";
 import util from "node:util";
 
 /**
@@ -25,17 +27,20 @@ import util from "node:util";
  * - It only allows for the ':' separator
  */
 
-export const LEVELS: string[] = ["debug", "info", "warn", "error", "off"] as const;
-export const ICONS: string[] = ["🟢", "🔵", "🟡", "🔴", "🔕", "🟤"] as const;
+export const LEVELS: string[] = ["debug", "info", "warn", "error", "log", "off"] as const;
+export const ICONS: string[] = ["🟢", "🔵", "🟡", "🔴", "🟤", "🔕"] as const;
 const COLORS = [colors.red, colors.yellow, colors.blue, colors.magenta, colors.cyan] as const;
 
 // Original console if you ever want to go back to it
-export const CONSOLE = globalThis.console;
+export const CONSOLE = omit(globalThis.console, ["table"]) as Console;
 
 // Set of rules to determine whether to enable a debug namespace
 // deno-lint-ignore no-process-global
 const DEBUGS_ALL = new Set<string>(process?.env.DEBUG?.trim().split(/[\s,]+/));
 const DEBUGS_STAR = [...DEBUGS_ALL].filter((d) => d.endsWith("*")).map((d) => d.slice(0, -1));
+
+// Buffer used to debug (off by default)
+export const BUFFER: string[][] = [];
 
 /**
  * Default options for the hub
@@ -49,66 +54,73 @@ const DEBUGS_STAR = [...DEBUGS_ALL].filter((d) => d.endsWith("*")).map((d) => d.
  * @param colors - Colors to use
  */
 export class Options {
-  // Only the root hub can have a buffer
-  buffer?: unknown[][] | undefined;
+  buffer = false;
   compact = true;
   console?: Console;
   defaultLevel: typeof LEVELS[number] = "info";
   fileLine? = true;
   icons?: string | string[] = ICONS;
+  root: string = "";
   timeDiff = true;
 }
 
 export const DEFAULTS = new Options() as Readonly<Options>;
 
 // Cache of all instances created
-const root = create("*");
-const cache = new Map<string, Console & { level: string }>([["*", root]]);
+const cache = new Map<string, Console & { level: string; options: Options }>();
 
 // Private ON/OFF switch
 let onOff = true;
 
 // Utility function color deterministically based on the hash of the namespace (using djb2 XOR version)
 // See https://gist.github.com/eplawless/52813b1d8ad9af510d85
-function color(ns: string, apply = false, bold = true): string | number {
+export function color(ns: string, apply = false, bold = true): string | number {
   const hash = (s: string) => [...s].reduce((h, c) => h * 33 ^ c.charCodeAt(0), 5381) >>> 0;
   const i = Math.abs(hash(ns)) % COLORS.length;
   return apply ? (bold ? colors.bold(COLORS[i](ns)) : COLORS[i](ns)) : i;
 }
 
+// Find correct instance based on filename
+function findInstance(filename: string) {
+  for (const [_, i] of cache) {
+    if (filename.startsWith(i.options.root)) return i;
+  }
+}
+
 // Utility function to prefix the output (with namespace, fileLine, etc). We need to do this
 // because we want to be 100% compatible with the console object
 
-export function parameters(args: unknown[], ns: string, level: number, options: Partial<Options> = DEFAULTS): unknown[] {
+export function parameters(args: unknown[], ns: string, level: number, options: Partial<Options> = DEFAULTS, line: string): unknown[] {
   // Add colors to the namespace (Deno takes care of removing if no TTY?)
-  let prefix = color(ns, true, true) as string;
+  let prefix = ns === "*" ? "" : color(ns, true, true) as string;
 
   // Figure fileLine option(s)
   const fileLine = options.fileLine ?? DEFAULTS.fileLine;
-  const [f, l] = (fileLine ? new Error().stack?.split("\n")[3].split("/").pop()?.split(":") : []) as string[];
-  if (fileLine) prefix = colors.underline(colors.white("[" + f + ":" + l + "]")) + " " + prefix;
+  const [b, l] = (fileLine ? line.split("/").pop()?.split(":") : []) as string[];
+  if (fileLine) prefix = colors.underline(colors.white("[" + b + ":" + l + "]")) + " " + prefix;
 
   // Should we add icons?
   const icons = options.icons ?? DEFAULTS.icons;
   if (icons) prefix = (icons.at(level) ?? icons) + " " + prefix;
 
-  // If compact is true apply util.instpect to all arguments being objects
+  // If compact is true apply util.inspect to all arguments being objects
   // deno-lint-ignore no-process-global
   const noColor = process?.env.NO_COLOR !== undefined;
   const inspectOptions = { breakLength: Infinity, colors: !noColor, compact: true, maxArrayLength: 25 };
   if (options.compact ?? DEFAULTS.compact) args = args.map((a) => typeof a === "object" ? util.inspect(a, inspectOptions) : a);
 
   // Organize parameters
-  args = typeof args.at(0) === "string" ? [prefix + " " + args.shift(), ...args] : [prefix, ...args];
-
-  // Add to buffer
-  const length = DEFAULTS.buffer ? DEFAULTS.buffer.push([LEVELS[level], args]) : 0;
-  if (length > 1000) throw new Error("Buffer is just meant for tests. If it has grown beyond '1,000' it probably means that you left it on by mistake.");
+  args = typeof args.at(0) === "string" ? [prefix + (ns === "*" ? "" : " ") + args.shift(), ...args] : [prefix, ...args];
 
   // Should we add time?
   const timeDiff = options.timeDiff ?? DEFAULTS.timeDiff;
   if (timeDiff) args.push(COLORS[color(ns) as number]("+" + performance.measure(ns, ns).duration.toFixed(2).toString() + "ms"));
   performance.mark(ns);
+
+  // Add to buffer
+  const buffer = options.buffer || DEFAULTS.buffer;
+  const length = buffer ? BUFFER.push([LEVELS[level], ...args as string[]]) : 0;
+  if (length > 1000) throw new Error("Buffer is just meant for tests. If it has grown beyond '1,000' it probably means that you left it on by mistake.");
 
   return args;
 }
@@ -131,29 +143,49 @@ export function setup(options: Partial<Options> = {}, debugs?: string): void {
   }
 }
 
-function create(ns: string, options: Partial<Options> = {}): Console & { level: string } {
+function create(ns: string, options: Partial<Options> = {}): Console & { level: string; options: Options } {
   const debug = DEBUGS_ALL.has(ns) || DEBUGS_ALL.has("*") || DEBUGS_STAR.some((d) => ns.startsWith(d));
   let n = LEVELS.indexOf(debug ? "debug" : DEFAULTS.defaultLevel);
 
   // Create initial instance before decorating it with console methods
   performance.mark(ns);
 
+  // Make sure the root is resolved
+  if (options.root) options.root = resolve(options.root);
+
   // deno-fmt-ignore
   const instance = {
     get level() { return LEVELS[n]; },
-    set level(l: typeof LEVELS[number]) { n = LEVELS.indexOf(l); }
-  } as Console & { level: string, time: number };
+    set level(l: typeof LEVELS[number]) { n = LEVELS.indexOf(l); },
+  } as Console & { level: string; options: Options };
 
   // Get a pointer to the console to use internally (will be changed for testing)
   const c = DEFAULTS.console ?? CONSOLE;
 
-  // deno-lint-ignore no-explicit-any
-  LEVELS.slice(0, 4).forEach((l, i) => (instance as any)[l] = (...args: unknown[]) => n <= i && onOff ? (c as any)[l](...parameters(args, ns, i, options)) : () => {});
+  const max = Deno.env.get("HUB") === "log" ? 5 : 4;
+
+  LEVELS.slice(0, max).forEach((l, i) =>
+    // deno-lint-ignore no-explicit-any
+    (instance as any)[l] = (...args: unknown[]) => {
+      const line = new Error().stack?.split("\n")[2]!;
+      // Try to find an alternate namespace
+      if (ns === "*") {
+        const instance = findInstance(line.split("file://")[1]);
+        // deno-lint-ignore no-explicit-any
+        if (instance) return (instance as any)[l](...args);
+      }
+      // deno-lint-ignore no-explicit-any
+      return n <= i && onOff ? (c as any)[l](...parameters(args, ns, i, options, line)) : () => {};
+    }
+  );
   instance.trace = (...args: unknown[]) => onOff ? c.trace(...args) : undefined;
+
+  // Set options used in closure to be able to manipulate in the future
+  instance.options = options as Options;
 
   // Return completed prototype. It will NOT overwrite the previously defined functions
   // NOTE: By deleting the custom object versions we can go back to the prototype versions
-  return Object.setPrototypeOf(instance, c) as Console & { level: string };
+  return Object.setPrototypeOf(instance, c) as Console & { level: string; options: Options };
 }
 
 /**
@@ -161,21 +193,23 @@ function create(ns: string, options: Partial<Options> = {}): Console & { level: 
  * @param nsOrOnOff - Namespace, which is the name of the logger. Special values 'true' and 'false' will enable all or disable all
  * @param level - Level of logging
  * @param options - options for creation of logger
+ * @param force - Force creation of a new instance
  * @returns - extended console
  */
-export function hub(nsOrOnOff: boolean | string, level?: typeof LEVELS[number], options?: Partial<Options>): Console & { level: string } {
-  if (typeof nsOrOnOff === "boolean") return onOff = nsOrOnOff, root;
+export function hub(nsOrOnOff: boolean, level?: typeof LEVELS[number], options?: Partial<Options>, force?: boolean): boolean;
+export function hub(nsOrOnOff: string, level?: typeof LEVELS[number], options?: Partial<Options>, force?: boolean): Console & { level: string };
+export function hub(nsOrOnOff: boolean | string, level?: typeof LEVELS[number], options: Partial<Options> = {}, force = false): boolean | Console & { level: string } {
+  if (typeof nsOrOnOff === "boolean") return onOff = nsOrOnOff;
   const ns = nsOrOnOff;
-  if (!cache.has(ns)) cache.set(ns, create(ns));
+  if (!cache.has(ns) || force) cache.set(ns, create(ns, options));
   const instance = cache.get(ns) as Console & { level: string; options: Options };
-  if (instance && level) instance.level = level;
-  if (instance && options) Object.assign(instance.options, options);
+  if (level) instance.level = level;
+  if (options) Object.assign(instance.options, options);
   return instance;
 }
 
-// Replace console.log to print file and if env variable HUB is set
-const log = console.log;
-if (Deno.env.has("HUB")) console.log = (...args: unknown[]) => log(...parameters(args, "*", 5));
+const rootLevel = Deno.env.get("HUB");
+export const ROOT = hub("*", rootLevel ?? "debug");
 
-// Export private functions so that we can test
-export { color };
+// deno-lint-ignore no-global-assign
+if (rootLevel) console = ROOT;
