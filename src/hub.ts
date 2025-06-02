@@ -1,6 +1,5 @@
 import * as colors from "@std/fmt/colors";
-import { omit } from "@std/collections";
-import { resolve } from "@std/path";
+import { globToRegExp, resolve } from "@std/path";
 import util from "node:util";
 
 /**
@@ -10,12 +9,12 @@ import util from "node:util";
  * debug-js features and is just as opinionated. The less decisions you have to make
  * when invoking, the more time you can spend on your actual code.
  *
- * It supports the following levels to match the console: `debug`, `info`, `warn`, `error`
- * and `off`.
+ * It supports the following levels to match the console: `all`, `debug`, `info`, `warn`,
+ * `error` and `off`.
  *
  * It can supplant the `console` object, but it is not recommended to use it in libraries.
  * It is useful for when you forget where you put your `console.log` statements and want to
- * turn them off quickly.
+ * know where they are to turn them off quickly.
  *
  * It never touches `console.log` which is the most common method used in the wild. It does not
  * throw exceptions if you pass the wrong log level, but it will have the effect of printing
@@ -24,20 +23,16 @@ import util from "node:util";
  * Differences from `debug-js`:
  * - It does not support the `inspect` option
  * - It works not just for debug but for all levels
- * - It only allows for the ':' separator
+ * - It works with globs, now with log names and separators
  */
 
 export const LEVELS: string[] = ["debug", "info", "warn", "error", "log", "off"] as const;
 export const ICONS: string[] = ["🟢", "🔵", "🟡", "🔴", "🟤", "🔕"] as const;
+export const GLOBS: RegExp[][] = LEVELS.map((_) => []);
 const COLORS = [colors.red, colors.yellow, colors.blue, colors.magenta, colors.cyan] as const;
 
-// Original console if you ever want to go back to it
-export const CONSOLE = omit(globalThis.console, ["table"]) as Console;
-
-// Set of rules to determine whether to enable a debug namespace
-// deno-lint-ignore no-process-global
-const DEBUGS_ALL = new Set<string>(process?.env.DEBUG?.trim().split(/[\s,]+/));
-const DEBUGS_STAR = [...DEBUGS_ALL].filter((d) => d.endsWith("*")).map((d) => d.slice(0, -1));
+// Original methods
+const ORIGINALS = { debug: console.debug, warn: console.warn, info: console.info, error: console.error, log: console.log };
 
 // Buffer used to debug (off by default)
 export const BUFFER: string[][] = [];
@@ -46,8 +41,6 @@ export const BUFFER: string[][] = [];
  * Default options for the hub
  * @param buffer - Buffer to store messages
  * @param compact - Compact mode (util.inspect)
- * @param console - Console object to use
- * @param defaultLevel - Default level to use
  * @param fileLine - Whether to show file and line
  * @param icons - Whether to show icons (if available)
  * @param timeDiff - Whether to show time difference
@@ -56,21 +49,17 @@ export const BUFFER: string[][] = [];
 export class Options {
   buffer = false;
   compact = true;
-  console?: Console;
-  defaultLevel: typeof LEVELS[number] = "info";
   fileLine? = true;
   icons?: string | string[] = ICONS;
+  includeLog: boolean | undefined;
   root: string = "";
   timeDiff = true;
 }
 
-export const DEFAULTS = new Options() as Readonly<Options>;
+export const DEFAULTS: Options = new Options();
 
 // Cache of all instances created
 const cache = new Map<string, Console & { level: string; options: Options }>();
-
-// Private ON/OFF switch
-let onOff = true;
 
 // Utility function color deterministically based on the hash of the namespace (using djb2 XOR version)
 // See https://gist.github.com/eplawless/52813b1d8ad9af510d85
@@ -80,7 +69,7 @@ export function color(ns: string, apply = false, bold = true): string | number {
   return apply ? (bold ? colors.bold(COLORS[i](ns)) : COLORS[i](ns)) : i;
 }
 
-// Find correct instance based on filename
+// Find the correct instance based on filename
 function findInstance(filename: string) {
   for (const [_, i] of cache) {
     if (filename.startsWith(i.options.root)) return i;
@@ -89,8 +78,7 @@ function findInstance(filename: string) {
 
 // Utility function to prefix the output (with namespace, fileLine, etc). We need to do this
 // because we want to be 100% compatible with the console object
-
-export function parameters(args: unknown[], ns: string, level: number, options: Partial<Options> = DEFAULTS, line: string): unknown[] {
+export function parameters(args: unknown[], ns: string, level: number, options: Partial<Options> = {}, line: string): unknown[] {
   // Add colors to the namespace (Deno takes care of removing if no TTY?)
   let prefix = ns === "*" ? "" : color(ns, true, true) as string;
 
@@ -104,8 +92,7 @@ export function parameters(args: unknown[], ns: string, level: number, options: 
   if (icons) prefix = (icons.at(level) ?? icons) + " " + prefix;
 
   // If compact is true apply util.inspect to all arguments being objects
-  // deno-lint-ignore no-process-global
-  const noColor = process?.env.NO_COLOR !== undefined;
+  const noColor = Deno.env.get("NO_COLOR") !== undefined;
   const inspectOptions = { breakLength: Infinity, colors: !noColor, compact: true, maxArrayLength: 25 };
   if (options.compact ?? DEFAULTS.compact) args = args.map((a) => typeof a === "object" ? util.inspect(a, inspectOptions) : a);
 
@@ -114,7 +101,7 @@ export function parameters(args: unknown[], ns: string, level: number, options: 
 
   // Should we add time?
   const timeDiff = options.timeDiff ?? DEFAULTS.timeDiff;
-  if (timeDiff) args.push(COLORS[color(ns) as number]("+" + performance.measure(ns, ns).duration.toFixed(2).toString() + "ms"));
+  if (timeDiff) args.push(colors.white("+" + performance.measure(ns, ns).duration.toFixed(2).toString() + "ms"));
   performance.mark(ns);
 
   // Add to buffer
@@ -126,28 +113,33 @@ export function parameters(args: unknown[], ns: string, level: number, options: 
 }
 
 /**
- * Function to setup flags based on DEBUG environment variable. Used to enable
+ * Function to set up flags based on environment variable. Used to enable
  * based on space or comma-delimited names.
  *
- * @param options - options for setup
- * @param debugs
+ * @param level
+ * @param value
  */
-export function setup(options: Partial<Options> = {}, debugs?: string): void {
-  Object.assign(DEFAULTS, options);
-  if (!debugs) return;
-  DEBUGS_ALL.clear();
-  DEBUGS_STAR.length = 0;
-  for (const ns of debugs.trim().split(/[\s,]+/)) {
-    DEBUGS_ALL.add(ns);
-    if (ns.endsWith("*")) DEBUGS_STAR.push(ns.slice(0, -1));
+export function configure(level: typeof LEVELS[number], value = Deno.env.get(level.toUpperCase())): void {
+  const n = LEVELS.indexOf(level);
+  GLOBS[n] = value?.trim().split(/[\s,]+/).filter((g) => g.length).map((g) => globToRegExp(g)) ?? [];
+
+  // Reset levels (potentially costly if too many logs)
+  for (const [ns, i] of cache) i.level = getLevel(ns);
+}
+
+function getLevel(ns: string) {
+  for (let l = GLOBS.length - 1; l >= 0; l--) {
+    if (GLOBS[l].some((re) => re.test(ns))) return LEVELS[l];
   }
+  return "info";
 }
 
 function create(ns: string, options: Partial<Options> = {}): Console & { level: string; options: Options } {
-  const debug = DEBUGS_ALL.has(ns) || DEBUGS_ALL.has("*") || DEBUGS_STAR.some((d) => ns.startsWith(d));
-  let n = LEVELS.indexOf(debug ? "debug" : DEFAULTS.defaultLevel);
+  // Get the level for the log
+  const level = getLevel(ns);
+  let n = LEVELS.indexOf(level);
 
-  // Create initial instance before decorating it with console methods
+  // Create the initial instance before decorating it with console methods
   performance.mark(ns);
 
   // Make sure the root is resolved
@@ -159,11 +151,8 @@ function create(ns: string, options: Partial<Options> = {}): Console & { level: 
     set level(l: typeof LEVELS[number]) { n = LEVELS.indexOf(l); },
   } as Console & { level: string; options: Options };
 
-  // Get a pointer to the console to use internally (will be changed for testing)
-  const c = DEFAULTS.console ?? CONSOLE;
-
-  const max = Deno.env.get("HUB") === "log" ? 5 : 4;
-
+  const includeLog = options.includeLog ?? DEFAULTS.includeLog;
+  const max = includeLog ? 5 : 4;
   LEVELS.slice(0, max).forEach((l, i) =>
     // deno-lint-ignore no-explicit-any
     (instance as any)[l] = (...args: unknown[]) => {
@@ -175,41 +164,27 @@ function create(ns: string, options: Partial<Options> = {}): Console & { level: 
         if (instance) return (instance as any)[l](...args);
       }
       // deno-lint-ignore no-explicit-any
-      return n <= i && onOff ? (c as any)[l](...parameters(args, ns, i, options, line)) : () => {};
+      return n <= i ? (ORIGINALS as any)[l](...parameters(args, ns, i, options, line)) : () => {};
     }
   );
-  instance.trace = (...args: unknown[]) => onOff ? c.trace(...args) : undefined;
 
   // Set options used in closure to be able to manipulate in the future
   instance.options = options as Options;
 
-  // Return completed prototype. It will NOT overwrite the previously defined functions
+  // Return the completed prototype. It will NOT overwrite the previously defined functions
   // NOTE: By deleting the custom object versions we can go back to the prototype versions
-  return Object.setPrototypeOf(instance, c) as Console & { level: string; options: Options };
+  return Object.setPrototypeOf(instance, console) as Console & { level: string; options: Options };
 }
 
-/**
- * Creates a console object (which you can think of as a soup-up console)
- * @param nsOrOnOff - Namespace, which is the name of the logger. Special values 'true' and 'false' will enable all or disable all
- * @param level - Level of logging
- * @param options - options for creation of logger
- * @param force - Force creation of a new instance
- * @returns - extended console
- */
-export function hub(nsOrOnOff: boolean, level?: typeof LEVELS[number], options?: Partial<Options>, force?: boolean): boolean;
-export function hub(nsOrOnOff: string, level?: typeof LEVELS[number], options?: Partial<Options>, force?: boolean): Console & { level: string };
-export function hub(nsOrOnOff: boolean | string, level?: typeof LEVELS[number], options: Partial<Options> = {}, force = false): boolean | Console & { level: string } {
-  if (typeof nsOrOnOff === "boolean") return onOff = nsOrOnOff;
-  const ns = nsOrOnOff;
+export function hub(ns: string, options: Partial<Options> = {}, force = false): Console & { level: string } {
   if (!cache.has(ns) || force) cache.set(ns, create(ns, options));
   const instance = cache.get(ns) as Console & { level: string; options: Options };
-  if (level) instance.level = level;
   if (options) Object.assign(instance.options, options);
   return instance;
 }
 
-const rootLevel = Deno.env.get("HUB");
-export const ROOT = hub("*", rootLevel ?? "debug");
+// Configure based on environment variables
+for (const level of LEVELS) configure(level);
 
-// deno-lint-ignore no-global-assign
-if (rootLevel) console = ROOT;
+// const ROOT = hub("*");
+// if (rootLevel) console = ROOT;

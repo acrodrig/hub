@@ -1,55 +1,62 @@
 #!/usr/bin/env -S deno test -A
 
 import { assertEquals } from "@std/assert";
-import { BUFFER, CONSOLE, DEFAULTS, hub, ROOT } from "../src/hub.ts";
+import { BUFFER, configure, DEFAULTS, hub } from "../src/hub.ts";
 import { assertStringIncludes } from "@std/assert/string-includes";
 
 const FILENAME = import.meta.filename?.split("/").pop()!;
+const original = console;
 
-// deno-lint-ignore no-explicit-any
-(DEFAULTS as any).buffer = true;
+DEFAULTS.buffer = true;
 
 Deno.test("Replace Original Console", () => {
   BUFFER.length = 0;
 
-  // Fake setting HUB env variable to "debug"
-  Deno.env.set("HUB", "debug");
+  // Fake setting DEBUG env variable to "*"
+  configure("debug", "*");
+
   // deno-lint-ignore no-global-assign
-  console = hub("*", "debug");
+  console = hub("*");
+
+  // Will call console.debug which has been replaced and console.log which has not
   console.debug("debug");
   console.log("log");
   assertEquals(BUFFER.length, 1);
   assertEquals(BUFFER[0][0], "debug");
   assertStringIncludes(BUFFER[0][1], FILENAME);
+
   // deno-lint-ignore no-global-assign
-  console = CONSOLE;
-  Deno.env.delete("HUB");
+  console = original;
 });
 
 Deno.test("Include log in Replacement", () => {
   BUFFER.length = 0;
 
-  // Fake setting HUB env variable to "log"
-  Deno.env.set("HUB", "log");
+  // Fake setting INFO env variable to "*"
+  configure("info", "*");
+
   // deno-lint-ignore no-global-assign
-  console = hub("*", "log", {}, true);
+  console = hub("*", { includeLog: true }, true);
+
+  // First call will be a no-op, but second will be included
   console.debug("debug");
   console.log("log");
   assertEquals(BUFFER.length, 1);
   assertEquals(BUFFER[0][0], "log");
   assertStringIncludes(BUFFER[0][1], FILENAME);
+
   // deno-lint-ignore no-global-assign
-  console = CONSOLE;
-  Deno.env.delete("HUB");
+  console = original;
 });
 
 Deno.test("Global Console", () => {
-  // Declare a 'test' namespace on parent dir
-  hub("test", "info", { buffer: true, root: import.meta.dirname + "/../" });
-
   BUFFER.length = 0;
+
+  // Declare a 'test' namespace on parent dir
+  hub("test", { buffer: true, root: import.meta.dirname + "/../" });
+
   // deno-lint-ignore no-global-assign
-  console = ROOT;
+  console = hub("*");
 
   console.debug("debug");
   console.info("info");

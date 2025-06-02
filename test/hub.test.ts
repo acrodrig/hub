@@ -3,28 +3,28 @@
 import { assertEquals, assertGreaterOrEqual, assertLess, assertMatch } from "@std/assert";
 import { delay } from "@std/async";
 import * as colors from "@std/fmt/colors";
-import { BUFFER, color, CONSOLE, hub, ICONS, type Options, setup } from "../src/hub.ts";
+import { BUFFER, color, configure, DEFAULTS, hub, ICONS, type Options } from "../src/hub.ts";
 
 // We set a buffer to capture console.log messages
 const reset = (options: Partial<Options> = {}) => {
   BUFFER.length = 0;
   const defaults = { buffer: true, compact: true, defaultLevel: "info", fileLine: false, icons: ICONS, timeDiff: true };
-  setup(Object.assign({}, defaults, options));
+  Object.assign(DEFAULTS, defaults, options);
 };
 
-Deno.test("Basic", () => {
+Deno.test("Basic (no files, no times)", () => {
   reset({ fileLine: false, timeDiff: false });
 
   const log = hub("test");
 
-  // Test that we do NOT touch console.log, and default level is "info"
+  // Test that we do NOT touch console.log, and the default level is "info"
   log.debug("debug");
   log.info("info");
   log.warn("warn");
   log.error("error");
   log.log("log");
 
-  // Added to test that console.log is not touched
+  // Added to the test that console.log is not touched
   console.log("log");
 
   // Test validity
@@ -35,8 +35,8 @@ Deno.test("Basic", () => {
 Deno.test("File/Lines and Time (with debug level)", async () => {
   reset({ fileLine: true, icons: undefined, timeDiff: true });
 
-  const log = hub("test", "debug");
-
+  const log = hub("test");
+  log.level = "debug";
   log.debug("debug");
   await delay(10);
   log.log("log");
@@ -92,7 +92,8 @@ Deno.test("Unique Instances", () => {
   log2.info("from 2");
   assertEquals(BUFFER.length, 2);
 
-  const _log3 = hub("test", "error");
+  const log3 = hub("test");
+  log3.level = "error";
   log1.warn("from 1");
   log2.error("from 2");
   assertEquals(BUFFER.length, 3);
@@ -101,7 +102,8 @@ Deno.test("Unique Instances", () => {
 Deno.test("Objects via inspect (one line)", () => {
   reset({ compact: true });
 
-  const log = hub("test", "debug");
+  const log = hub("test");
+  log.level = "info";
 
   // Create a long array and print it in different ways
   const people = Array.from(Array(256).keys()).map((i) => ({ name: "Person " + i, age: i }));
@@ -120,6 +122,7 @@ Deno.test("Console Replacement", () => {
   const ns = ":console:", prefix = color(ns, true);
 
   // Replace the native console (start)
+  const original = console;
   // deno-lint-ignore no-global-assign
   console = hub(ns);
 
@@ -134,37 +137,37 @@ Deno.test("Console Replacement", () => {
 
   // End the replacement
   // deno-lint-ignore no-global-assign
-  console = CONSOLE;
+  console = original;
 
   // Test validity (buffer no longer increments)
   console.error("error");
   assertEquals(BUFFER.length, 2);
 });
 
-Deno.test("On/Off switch", () => {
+Deno.test("Turn off switch", () => {
   reset();
 
   const log = hub("test");
 
   // Before turning off
-  log.debug("1");
+  log.info("1");
   assertEquals(BUFFER.length, 1);
 
   // After turning off
-  hub(false);
-  log.debug("2");
+  configure("off", "*");
+  log.info("2");
   assertEquals(BUFFER.length, 1);
 
   // After turning on
-  hub(true);
-  log.debug("3");
+  configure("off", "");
+  log.info("3");
   assertEquals(BUFFER.length, 2);
 });
 
-Deno.test("Wildcards", () => {
+Deno.test("Globs", () => {
   reset();
 
-  setup({}, "f*");
+  configure("debug", "f*");
   const log1 = hub("foo");
   const log2 = hub("bar");
   log1.debug("debug");
