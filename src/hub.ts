@@ -56,6 +56,25 @@ export class Options {
   timeDiff = true;
 }
 
+// See https://github.com/nodejs/node/issues/7749#issuecomment-232972234
+class StackError extends Error {
+  constructor() {
+    super();
+    // deno-lint-ignore no-explicit-any
+    const original = (Error as any).prepareStackTrace;
+    try {
+      // deno-lint-ignore no-explicit-any
+      (Error as any).prepareStackTrace = (_: Error, callsites: any[]) => callsites;
+      Error.captureStackTrace(this);
+      // NOTE: needed to invoke the getter for stack
+      this.stack;
+    } finally {
+      // deno-lint-ignore no-explicit-any
+      (Error as any).prepareStackTrace = original;
+    }
+  }
+}
+
 export const DEFAULTS: Options = new Options();
 
 // Cache of all instances created
@@ -78,14 +97,15 @@ function findInstance(filename: string) {
 
 // Utility function to prefix the output (with namespace, fileLine, etc). We need to do this
 // because we want to be 100% compatible with the console object
-export function parameters(args: unknown[], ns: string, level: number, options: Partial<Options> = {}, line: string): unknown[] {
+// deno-lint-ignore no-explicit-any
+function parameters(args: unknown[], ns: string, level: number, options: Partial<Options> = {}, callsite: any): unknown[] {
   // Add colors to the namespace (Deno takes care of removing if no TTY?)
   let prefix = ns === "*" ? "" : color(ns, true, true) as string;
 
   // Figure fileLine option(s)
   const fileLine = options.fileLine ?? DEFAULTS.fileLine;
-  const [b, l] = (fileLine ? line.split("/").pop()?.split(":") : []) as string[];
-  if (fileLine) prefix = colors.underline(colors.white("[" + b + ":" + l + "]")) + " " + prefix;
+  const basename = callsite.getFileName().split("/").pop();
+  if (fileLine) prefix = colors.underline(colors.white("[" + basename + ":" + callsite.getLineNumber() + "]")) + " " + prefix;
 
   // Should we add icons?
   const icons = options.icons ?? DEFAULTS.icons;
@@ -156,15 +176,19 @@ function create(ns: string, options: Partial<Options> = {}): Console & { level: 
   LEVELS.slice(0, max).forEach((l, i) =>
     // deno-lint-ignore no-explicit-any
     (instance as any)[l] = (...args: unknown[]) => {
-      const line = new Error().stack?.split("\n")[2]!;
+      // See https://github.com/nodejs/node/issues/7749#issuecomment-232972234
+      // deno-lint-ignore no-explicit-any
+      const callsites = new StackError().stack! as unknown as any[];
+      const callsite = callsites[2]!;
       // Try to find an alternate namespace
       if (ns === "*") {
-        const instance = findInstance(line.split("file://")[1]);
+        // See https://v8.dev/docs/stack-trace-api#customizing-stack-traces
+        const instance = findInstance(callsite.getFileName());
         // deno-lint-ignore no-explicit-any
         if (instance) return (instance as any)[l](...args);
       }
       // deno-lint-ignore no-explicit-any
-      return n <= i ? (ORIGINALS as any)[l](...parameters(args, ns, i, options, line)) : () => {};
+      return n <= i ? (ORIGINALS as any)[l](...parameters(args, ns, i, options, callsite)) : () => {};
     }
   );
 
