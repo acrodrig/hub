@@ -1,5 +1,5 @@
 import * as colors from "@std/fmt/colors";
-import { globToRegExp, resolve } from "@std/path";
+import { globToRegExp } from "@std/path";
 import util from "node:util";
 
 /**
@@ -31,6 +31,9 @@ export const ICONS: string[] = ["🟢", "🔵", "🟡", "🔴", "🟤", "🔕"] 
 export const GLOBS: RegExp[][] = LEVELS.map((_) => []);
 const COLORS = [colors.red, colors.yellow, colors.blue, colors.magenta, colors.cyan] as const;
 
+// A map from level names to ordinals
+const ORDINALS = new Map(LEVELS.map((l, i) => [l, i]));
+
 // Original methods
 const ORIGINALS = { debug: console.debug, warn: console.warn, info: console.info, error: console.error, log: console.log };
 
@@ -51,7 +54,6 @@ export class Options {
   compact = true;
   fileLine? = true;
   icons?: string | string[] = ICONS;
-  includeLog: boolean | undefined;
   root: string = "";
   timeDiff = true;
 }
@@ -86,13 +88,6 @@ export function color(ns: string, apply = false, bold = true): string | number {
   const hash = (s: string) => [...s].reduce((h, c) => h * 33 ^ c.charCodeAt(0), 5381) >>> 0;
   const i = Math.abs(hash(ns)) % COLORS.length;
   return apply ? (bold ? colors.bold(COLORS[i](ns)) : COLORS[i](ns)) : i;
-}
-
-// Find the correct instance based on filename
-function findInstance(filename: string) {
-  for (const [_, i] of cache) {
-    if (filename.startsWith(i.options.root)) return i;
-  }
 }
 
 // Utility function to prefix the output (with namespace, fileLine, etc). We need to do this
@@ -140,7 +135,7 @@ function parameters(args: unknown[], ns: string, level: number, options: Partial
  * @param value
  */
 export function configure(level: typeof LEVELS[number], value = Deno.env.get(level.toUpperCase())): void {
-  const n = LEVELS.indexOf(level);
+  const n = ORDINALS.get(level)!;
   GLOBS[n] = value?.trim().split(/[\s,]+/).filter((g) => g.length).map((g) => globToRegExp(g)) ?? [];
 
   // Reset levels (potentially costly if too many logs)
@@ -154,41 +149,41 @@ function getLevel(ns: string) {
   return "info";
 }
 
-function create(ns: string, options: Partial<Options> = {}): Console & { level: string; options: Options } {
+function create(namespace: string, options: Partial<Options> = {}): Console & { level: string; options: Options } {
   // Get the level for the log
-  const level = getLevel(ns);
-  let n = LEVELS.indexOf(level);
+  const level = getLevel(namespace);
+  let ordinal = ORDINALS.get(level)!;
 
   // Create the initial instance before decorating it with console methods
-  performance.mark(ns);
-
-  // Make sure the root is resolved
-  if (options.root) options.root = resolve(options.root);
+  performance.mark(namespace);
 
   // deno-fmt-ignore
   const instance = {
-    get level() { return LEVELS[n]; },
-    set level(l: typeof LEVELS[number]) { n = LEVELS.indexOf(l); },
+    get level() { return LEVELS[ordinal]; },
+    set level(l: typeof LEVELS[number]) { ordinal = ORDINALS.get(l)!; },
   } as Console & { level: string; options: Options };
 
-  const includeLog = options.includeLog ?? DEFAULTS.includeLog;
-  const max = includeLog ? 5 : 4;
-  LEVELS.slice(0, max).forEach((l, i) =>
+  LEVELS.slice(0, 4).forEach((l, i) =>
     // deno-lint-ignore no-explicit-any
     (instance as any)[l] = (...args: unknown[]) => {
       // See https://github.com/nodejs/node/issues/7749#issuecomment-232972234
       // deno-lint-ignore no-explicit-any
       const callsites = new StackError().stack! as unknown as any[];
       const callsite = callsites[2]!;
-      // Try to find an alternate namespace
-      if (ns === "*") {
-        // See https://v8.dev/docs/stack-trace-api#customizing-stack-traces
-        const instance = findInstance(callsite.getFileName());
-        // deno-lint-ignore no-explicit-any
-        if (instance) return (instance as any)[l](...args);
+      const fileName = callsite.getFileName()!;
+
+      // Try to find an alternate namespace if defined
+      if (namespace === "*") {
+        const entry = cache.entries().find(([_, i]) => fileName.startsWith(i.options.root));
+        if (entry) {
+          const ns = entry[0], o = ORDINALS.get(entry[1].level)!;
+          console.log(ns, l, args);
+          return o <= i ? (ORIGINALS as any)[l](...parameters(args, ns, i, options, callsite)) : () => {};
+        }
       }
+
       // deno-lint-ignore no-explicit-any
-      return n <= i ? (ORIGINALS as any)[l](...parameters(args, ns, i, options, callsite)) : () => {};
+      return ordinal <= i ? (ORIGINALS as any)[l](...parameters(args, namespace, i, options, callsite)) : () => {};
     }
   );
 
@@ -209,6 +204,3 @@ export function hub(ns: string, options: Partial<Options> = {}, force = false): 
 
 // Configure based on environment variables
 for (const level of LEVELS) configure(level);
-
-// const ROOT = hub("*");
-// if (rootLevel) console = ROOT;
