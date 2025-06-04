@@ -178,6 +178,7 @@ function create(namespace: string, options: Partial<Options> = {}): Console & { 
         if (entry) {
           const ns = entry[0], o = ORDINALS.get(entry[1].level)!;
           console.log(ns, l, args);
+          // deno-lint-ignore no-explicit-any
           return o <= i ? (ORIGINALS as any)[l](...parameters(args, ns, i, options, callsite)) : () => {};
         }
       }
