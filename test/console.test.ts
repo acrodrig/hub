@@ -73,4 +73,3 @@ Deno.test("External Module Namespace", async () => {
   assertEquals(BUFFER[0][0], "info");
   assertEquals(clean(BUFFER[0][1]), "🔵 [hub-external-test.ts:2] gists Hello world!");
 });
-
